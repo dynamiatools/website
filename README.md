@@ -1,10 +1,14 @@
-# dynamia.tools
+# DynamiaTools Website
 
 This folder contains the source code and documentation powering https://dynamia.tools
 
 
 
-## Requeriments
+## Requirements
 - Ruby
 - Jekyll
+
+## Work locally
+
+Just run ``jekyll serve --force_polling --livereload``
 
