@@ -28,9 +28,14 @@
 </ul>
 
 <ul class="navbar-nav navbar-nav flex-row flex-wrap ms-md-auto extras">
+    <li class="navbar-item">
+        <a class="navbar-link p-2 outline" target="_blank" href="{{ site.github.repository_url}}/blob/{{site.current_branch}}/{{page.path}}"> Edit this Page </a>
+    </li>
+
     {% for item in site.data.navigation.extras %}
     <li class="navbar-item">
         <a class="navbar-link p-2" target="_blank" href="{{item.url}}" title="{{item.title}}"> <i class="bi bi-{{item.icon}}"></i> </a>
     </li>
     {% endfor %}
+
 </ul>

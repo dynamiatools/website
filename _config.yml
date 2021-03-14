@@ -7,7 +7,10 @@ url: "https://dynamia.tools" # the base hostname & protocol for your site, e.g. 
 twitter_username: DynamiaTools
 github_username:  dynamiatools
 github_url: https://github.com/dynamiatools/framework
+current_branch: main
 logo: /assets/images/logo.png
+icon: /assets/images/icon.png
+stable_version: 4.0.1
 
 # Build settings
 markdown: kramdown
