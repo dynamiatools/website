@@ -58,7 +58,7 @@ better documentations and demos.
 
 ## License
 
-DynamiaTools is available under the [LGPL v3 License](https://github.com/dynamia-projects/dynamia-tools/blob/master/LICENSE.md).
+DynamiaTools is available under the Apache 2 license
 
 ## Want contribute?
-Please read [Contributing Guidelines](https://github.com/dynamia-projects/dynamia-tools/blob/master/CONTRIBUTING.md)
+Please read [Contributing Guidelines](https://github.com/dynamiatools/framework/blob/master/CONTRIBUTING.md)
