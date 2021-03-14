@@ -5,7 +5,8 @@ description: >- # this means to ignore newlines until "baseurl:"
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "https://dynamia.tools" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: DynamiaTools
-github_username:  dynamia-projects
+github_username:  dynamiatools
+github_url: https://github.com/dynamiatools/framework
 logo: /assets/images/logo.png
 
 # Build settings
