@@ -1,0 +1,19 @@
+title: DynamiaTools
+email: info@dynamiasoluciones.com
+description: >- # this means to ignore newlines until "baseurl:"
+  Fullstack Java framework for enterprise web applications
+baseurl: "" # the subpath of your site, e.g. /blog
+url: "https://dynamia.tools" # the base hostname & protocol for your site, e.g. http://example.com
+twitter_username: DynamiaTools
+github_username:  dynamia-projects
+logo: /assets/images/logo.png
+
+# Build settings
+markdown: kramdown
+theme: jekyll-theme-cayman
+plugins:
+  - jekyll-feed
+
+sass:
+    sass_dir: _sass
+

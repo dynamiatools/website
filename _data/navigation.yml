@@ -1,0 +1,28 @@
+nav:
+  - title: Home
+    url: /
+  - title: Learn
+    url: '#'
+    id: learn
+    subnav:
+      - title: Getting Started
+        url: getting-started
+      - title: Tutorials
+        url: /tutorials
+      - title: Docs
+        url: /docs
+  - title: Support
+    url: /support
+  - title: About
+    url: /about
+
+extras:
+  - title: Github
+    url: https://github.com/dynamia-projects/dynamia-tools
+    icon: github
+  - title: Twitter
+    url: https://twitter.com/dynamiatools
+    icon: twitter
+  - title: Stack Overflow
+    url: 'https://stackoverflow.com/questions/tagged/dynamia-tools'
+    icon: stack 
