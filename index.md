@@ -18,5 +18,6 @@ DynamiaTools is a powerful Java framework for building rapid enterprise web appl
 - Model View Controller (MVC)
 - Model View ViewModel (MVVM)
 - Modules, services and actions
+- Events oriented programming
 
 
