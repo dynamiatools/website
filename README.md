@@ -10,5 +10,5 @@ This folder contains the source code and documentation powering https://dynamia.
 
 ## Work locally
 
-Just run ``jekyll serve --force_polling --livereload``
+Just run ``jekyll serve --incremental``
 

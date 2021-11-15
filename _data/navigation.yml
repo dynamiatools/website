@@ -9,8 +9,8 @@ nav:
         url: getting-started
       - title: Tutorials
         url: /tutorials
-      - title: Docs
-        url: /docs
+      - title: Documentation
+        url: /documentation
   - title: Support
     url: /support
   - title: About
