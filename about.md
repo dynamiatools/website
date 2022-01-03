@@ -27,7 +27,7 @@ and many HTML5 technologies
 
 ## History 
 
-We start developing DynamiaTools ten years ago  as an internal utility library for our projects at Dynamia Soluciones IT.  
+We start developing DynamiaTools 13 years ago  as an internal utility library for our projects at Dynamia Soluciones IT.  
 We needed that our developers could create web applications fast without too much knowledge about specific frameworks or APIs like Spring or JPA. 
 
 First version was  focus in many utility classes for hiding spring complexity, ZK apis, database connection,
