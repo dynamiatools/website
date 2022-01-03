@@ -1,16 +1,16 @@
 title: DynamiaTools
 email: info@dynamiasoluciones.com
 description: >- # this means to ignore newlines until "baseurl:"
-  Fullstack Java framework for enterprise web applications
-baseurl: "" # the subpath of your site, e.g. /blog
-url: "https://dynamia.tools" # the base hostname & protocol for your site, e.g. http://example.com
+  Fullstack Java 11+ framework for enterprise web applications
+baseurl: ""
+url: "https://dynamia.tools"
 twitter_username: DynamiaTools
 github_username:  dynamiatools
 github_url: https://github.com/dynamiatools/framework
 current_branch: main
 logo: /assets/images/logo.png
 icon: /assets/images/icon.png
-stable_version: 4.0.4
+stable_version: 4.0.5
 
 # Build settings
 markdown: kramdown
