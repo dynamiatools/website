@@ -10,7 +10,7 @@ github_url: https://github.com/dynamiatools/framework
 current_branch: main
 logo: /assets/images/logo.png
 icon: /assets/images/icon.png
-stable_version: 4.0.5
+stable_version: 4.0.8
 
 # Build settings
 markdown: kramdown
