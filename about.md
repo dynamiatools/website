@@ -56,6 +56,9 @@ more products to share.
 Version 4.x will focus on support Java 11 and beyond, increase performance, integrate new frameworks and write much
 better documentations and demos.
 
+Version 5.x  support Java 17+, Spring Boot 3 and Hibernate 6.x
+
+
 ## License
 
 DynamiaTools is available under the Apache 2 license
