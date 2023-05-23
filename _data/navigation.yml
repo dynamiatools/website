@@ -6,11 +6,11 @@ nav:
     id: learn
     subnav:
       - title: Getting Started
-        url: getting-started
+        url: /docs/en/getting-started
       - title: Tutorials
-        url: /tutorials
+        url: /docs/en/tutorials
       - title: Documentation
-        url: /documentation
+        url: /docs/en
   - title: Support
     url: /support
   - title: About
@@ -25,4 +25,4 @@ extras:
     icon: twitter
   - title: Stack Overflow
     url: 'https://stackoverflow.com/questions/tagged/dynamia-tools'
-    icon: stack 
+    icon: stack
