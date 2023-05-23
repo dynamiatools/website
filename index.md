@@ -72,14 +72,14 @@ class MyApplication {
 <dependencies>   
     <dependency>
         <groupId>tools.dynamia</groupId>
-        <artifactId>tools.dynamia.zk.app</artifactId>
-        <version>4.2.0</version>
+        <artifactId>tools.dynamia.zk</artifactId>
+        <version>{{site.stable_version}}</version>
     </dependency>
 
     <dependency>
         <groupId>tools.dynamia</groupId>
         <artifactId>tools.dynamia.domain.jpa</artifactId>
-        <version>4.2.0</version>
+        <version>{{site.stable_version}}</version>
     </dependency>    
 </dependencies>
 ```
@@ -87,7 +87,7 @@ class MyApplication {
 **Gradle**
 
 ```groovy
-compile 'tools.dynamia:tools.dynamia.zk.app:4.2.0'
-compile 'tools.dynamia:tools.dynamia.domain.jpa:4.2.0'
+compile 'tools.dynamia:tools.dynamia.zk:{{site.stable_version}}'
+compile 'tools.dynamia:tools.dynamia.domain.jpa:{{site.stable_version}}'
 ```
 

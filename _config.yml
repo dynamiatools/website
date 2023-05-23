@@ -1,7 +1,7 @@
 title: DynamiaTools
 email: info@dynamiasoluciones.com
 description: >- # this means to ignore newlines until "baseurl:"
-  Fullstack Java 11+ framework for enterprise web applications powered by Spring Boot and ZK
+  Fullstack Java 17+ framework for enterprise web applications powered by Spring Boot 3 and ZK 9
 baseurl: ""
 url: "https://dynamia.tools"
 twitter_username: DynamiaTools
@@ -10,7 +10,7 @@ github_url: https://github.com/dynamiatools/framework
 current_branch: main
 logo: /assets/images/logo.png
 icon: /assets/images/icon.png
-stable_version: 4.2.0
+stable_version: 5.0.2
 
 # Build settings
 markdown: kramdown
