@@ -8,6 +8,7 @@ layout: page
 dynamia tools offers you multiple functionalities to implement in your project, in the following example we will show how to make a simple form with dynamia tools in a simple way
 
 1. create the entity, we can create the entity using the SimpleEntity and BaseEntity classes, BaseEntity
+
 ```java
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
