@@ -5,9 +5,11 @@ layout: page
 
 ## first project
 
-dynamia tools offers you multiple functionalities to implement in your project, in the following example we will show how to make a simple form with dynamia tools in a simple way
+dynamia tools offers you multiple functionalities to implement in your project, in the following example we will show how to make a simple form with dynamia tools
 
-1. create the entity, we can create the entity using the SimpleEntity and BaseEntity classes, BaseEntity
+suppose we want to create a maintenance module where the technicians of an internet company can be categorized
+
+1. create the entity, we can create the entity using the SimpleEntity and BaseEntity classes
 
 ```java
 import jakarta.persistence.Entity;
@@ -40,7 +42,7 @@ public class CategoriaTecnico extends SimpleEntity {
 }
 ```
 
-SimpleEntity and BaseEntity fulfill the same functionality, which is to automatically create fields such as id, remoteId. the difference is that BaseEntity generates more fields for you than SimpleEntity
+SimpleEntity and BaseEntity fulfill the same functionality, which is to automatically create fields such as id, remoteId. the difference is that BaseEntity generates more fields than SimpleEntity
 
 2.create @Provider class to generate a crud module
 ```java

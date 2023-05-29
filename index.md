@@ -68,7 +68,6 @@ class MyApplication {
 **Maven**
 
 ```xml
-
 <dependencies>   
     <dependency>
         <groupId>tools.dynamia</groupId>
@@ -85,7 +84,6 @@ class MyApplication {
 ```
 
 **Gradle**
-
 ```groovy
 compile 'tools.dynamia:tools.dynamia.zk:{{site.stable_version}}'
 compile 'tools.dynamia:tools.dynamia.domain.jpa:{{site.stable_version}}'
