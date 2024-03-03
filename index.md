@@ -1,11 +1,32 @@
 ---
-
+# https://vitepress.dev/reference/default-theme-home-page
 layout: home
+
+hero:
+  name: "DynamiaTools"
+  text: "Official Documentation"
+  tagline: My great project tagline
+  actions:
+    - theme: brand
+      text: Markdown Examples
+      link: /markdown-examples
+    - theme: alt
+      text: API Examples
+      link: /api-examples
+
+features:
+  - title: Feature A
+    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Feature B
+    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
+  - title: Feature C
+    details: Lorem ipsum dolor sit amet, consectetur adipiscing elit
 ---
+
 
 DynamiaTools is a framework for building Java 17+ web applications fast and easy using standard design patterns, views
 descriptors for automatic UI generation, actions, services and modules. Powered by **Spring Boot** (https://spring.io), ZK
-9 (https://www.zkoss.org) for web UI and JPA 2.
+10 (https://www.zkoss.org) for web UI and JPA 2.
 
 ## With DynamiaTools you can
 
@@ -88,4 +109,3 @@ class MyApplication {
 compile 'tools.dynamia:tools.dynamia.zk:{{site.stable_version}}'
 compile 'tools.dynamia:tools.dynamia.domain.jpa:{{site.stable_version}}'
 ```
-
