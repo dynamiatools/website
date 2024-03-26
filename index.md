@@ -4,7 +4,7 @@ layout: home
 
 hero:
   name: "DynamiaTools"
-  text: "Official Documentation"
+  text: "DynamiaTools is a framework for building Java 17+ web applications"
   tagline: My great project tagline
   actions:
     - theme: brand
@@ -70,7 +70,7 @@ descriptors for automatic UI generation, actions, services and modules. Powered 
 ```java
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import tools.dynamia.zk.app.EnableDynamiaTools;
+import tools.dynamia.app.EnableDynamiaTools;
 
 @SpringBootApplication
 @EnableDynamiaTools // <- this is all you need
@@ -93,19 +93,13 @@ class MyApplication {
     <dependency>
         <groupId>tools.dynamia</groupId>
         <artifactId>tools.dynamia.zk</artifactId>
-        <version>{{site.stable_version}}</version>
+        <version>5.1.0</version>
     </dependency>
-
-    <dependency>
-        <groupId>tools.dynamia</groupId>
-        <artifactId>tools.dynamia.domain.jpa</artifactId>
-        <version>{{site.stable_version}}</version>
-    </dependency>    
+  
 </dependencies>
 ```
 
 **Gradle**
 ```groovy
 compile 'tools.dynamia:tools.dynamia.zk:{{site.stable_version}}'
-compile 'tools.dynamia:tools.dynamia.domain.jpa:{{site.stable_version}}'
 ```
