@@ -6,3 +6,5 @@ _site/
 Gemfile.lock
 .idea
 .vitepress/cache
+/node_modules/
+desktop.ini
