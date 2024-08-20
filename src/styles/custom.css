@@ -1,0 +1,18 @@
+:root {
+    --sl-color-accent: hsl(150, 76%, 34%);
+    --sl-color-accent-high: hsl(150, 76%, 40%);
+
+}
+
+[data-theme="light"]:root{
+    --sl-color-accent-high: hsl(150, 76%, 40%);
+    --sl-color-accent: hsl(150, 76%, 34%);
+}
+
+
+[data-has-hero] header {
+    border-bottom: 1px solid transparent;
+    background-color: transparent;
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+}

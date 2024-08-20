@@ -11,9 +11,19 @@ export default defineConfig({
             _TOOLS_VERSION_: JSON.stringify(dynamiaToolsVersion)
         }
     },
+    site: 'https://dynamia.tools',
     integrations: [
         starlight({
             title: 'DynamiaTools',
+            logo: {
+                light: './src/assets/dynamia-tools-light.svg',
+                dark: './src/assets/dynamia-tools-dark.svg',
+                replacesTitle: true,
+            },
+            favicon: './src/assets/favicon.png',
+            customCss: [
+                './src/styles/custom.css'
+            ],
             editLink: {
                 baseUrl: 'https://github.com/dynamiatools/website',
             },
@@ -42,6 +52,20 @@ export default defineConfig({
                         es: 'Guías',
                     },
                     autogenerate: {directory: 'guides'},
+                },
+                {
+                    label: 'About',
+                    translations: {
+                        es: 'Acerca de'
+                    },
+                    items: [
+                        'history',
+                        {
+                            label: 'Github',
+                            link: 'https://github.com/dynamiatools',
+
+                        }
+                    ]
                 }
             ],
         }),
