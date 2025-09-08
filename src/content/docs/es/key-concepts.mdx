@@ -1,0 +1,172 @@
+---
+title: Conceptos Clave
+description: Conceptos clave de DynamiaTools
+---
+
+import {Card} from "@astrojs/starlight/components";
+
+DynamiaTools está construido sobre varios conceptos clave que facilitan el desarrollo de aplicaciones web modulares, mantenibles y escalables. Comprender estos conceptos es fundamental para aprovechar eficazmente el framework.
+
+## Módulos
+Los módulos son los bloques fundamentales de una aplicación DynamiaTools. Cada módulo encapsula un conjunto distinto de funcionalidades o características, promoviendo la modularidad, reutilización y separación de responsabilidades. Los módulos pueden desarrollarse, probarse y desplegarse de forma independiente, permitiendo arquitecturas de aplicaciones escalables y mantenibles.
+
+### Páginas y Grupos de Páginas
+Las páginas son los elementos principales de navegación dentro de una aplicación DynamiaTools, representando cada una una vista o pantalla única. Las páginas se agrupan en PageGroups, que actúan como contenedores de páginas relacionadas, facilitando la organización lógica y una navegación más fluida. Esta estructura jerárquica simplifica la gestión de la interfaz y mejora la experiencia del usuario. Los módulos funcionan como enrutadores, definiendo reglas de navegación y relaciones entre páginas y grupos de páginas, asegurando un flujo de aplicación coherente.
+
+### Proveedores de Módulos
+Los módulos se definen usando Proveedores de Módulos, que son componentes Spring que implementan la interfaz `ModuleProvider`. El método `getModule()` retorna un objeto `Module` que contiene el ID, nombre, páginas y grupos de páginas del módulo. Los módulos se descubren y registran automáticamente por el framework al iniciar la aplicación.
+
+**Ejemplo de un proveedor de módulo simple que define un módulo con una sola página CRUD**
+
+```java
+//ContactModuleProvider.java
+package demo;
+import org.springframework.stereotype.Component;
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+
+@Component
+public class ContactModuleProvider implements ModuleProvider {
+    @Override
+    public Module getModule() {
+               //puede usar métodos encadenados o patrón builder
+               Module module = new Module("customers", "Clientes")
+                .addPageGroup(new PageGroup("page1", "La Página 1", "the/path/page")
+                        .addPage(new Page("page2", "La Página 2", "the/path/page"),
+                                new Page("page3", "La Página 3", "the/path/page"),
+                                new Page("page4", "La Página 4", "the/path/page")
+                        )
+                );
+
+               return module;
+    }
+}
+```
+
+## Navegación
+DynamiaTools provee un sistema de navegación robusto que permite a los desarrolladores definir y gestionar la estructura de navegación de la aplicación. El `NavigationManager` se encarga de manejar los eventos de navegación, gestionar el estado de la página actual y facilitar las transiciones entre páginas. Todos los módulos, páginas y grupos de páginas se registran en el `ModuleContainer` y pueden ser accedidos mediante el `NavigationManager` usando rutas o objetos Java como `Module`, `PageGroup` o `Page`.
+
+**Ejemplo de navegación a una página usando su ruta**
+```java
+NavigationManager.navigateTo("customers/crm/contacts");
+```
+Donde `customers` es un módulo, `/crm` es un grupo de páginas y `/contacts` es una página.
+
+## Entidades
+Las entidades son el modelo de datos central de la aplicación, normalmente mapeadas a tablas de base de datos usando anotaciones JPA. DynamiaTools simplifica la gestión de datos proporcionando operaciones CRUD automáticas para las entidades.
+
+### Operaciones CRUD
+DynamiaTools utiliza la interfaz `CrudService` para realizar operaciones CRUD sobre las entidades. El framework ofrece una implementación por defecto, `JpaCrudService`, que aprovecha JPA para la persistencia de datos. Con este servicio, no necesitas crear repositorios o DAOs separados para tus entidades; todo está centralizado y es fácil de usar.
+
+## Vistas
+Las vistas definen la interfaz de usuario de la aplicación. DynamiaTools utiliza descriptores de vistas, que son archivos YAML que describen el diseño y los componentes de la UI. Este enfoque permite un desarrollo rápido de interfaces sin necesidad de mucho código.
+
+### Formularios
+Los formularios son un tipo de vista utilizada para ingreso y edición de datos. Se generan automáticamente según la definición de la entidad y pueden personalizarse usando descriptores de vista. Los descriptores para formularios permiten especificar el diseño de los campos, tipos de componentes, reglas de validación y otros comportamientos de la UI en archivos YAML.
+
+**Ejemplo mínimo de vista de formulario**
+```yaml
+# /resources/META-INF/descriptors/ContactForm.yml
+view: form # requerido
+beanClass: demo.Contact # nombre de clase completo
+autofields: true # incluir automáticamente todos los campos de la entidad
+```
+
+**Ejemplo extendido de vista de formulario**
+
+```yaml
+# /resources/META-INF/descriptors/ContactForm.yml
+view: form # requerido
+beanClass: demo.Contact # nombre de clase completo
+autofields: false # desactiva inclusión automática de campos
+fields:
+  name:
+  lastName:
+    label: Apellido
+    params:
+      placeholder: Escribe el apellido aquí # atributo del componente
+
+
+  email:
+    label: Correo Electrónico
+    params:
+      span: 2 # ocupa 2 columnas en un grid de 12 columnas controlado por layout.columns
+
+  phone:
+    label: Teléfono
+
+  commnents:
+    component: textbox
+    params:
+      multiline: true
+      height: 100px # atributo del componente ZK Textbox
+      span: 2 # ancho completo en un grid de 12 columnas
+
+
+layout:
+  columns: 2
+```
+
+### Tablas
+Las tablas son otro tipo de vista utilizada para mostrar listas de entidades. Al igual que los formularios, las tablas se generan automáticamente según la definición de la entidad y pueden personalizarse usando descriptores de vista. Los descriptores para tablas permiten especificar qué campos mostrar, opciones de ordenamiento, paginación y otros comportamientos en archivos YAML.
+
+**Ejemplo mínimo de vista de tabla**
+```yaml
+# /resources/META-INF/descriptors/ContactTable.yml
+view: table
+beanClass: demo.Contact # nombre de clase completo
+autofields: true # incluir automáticamente todos los campos de la entidad
+```
+
+**Ejemplo extendido de vista de tabla**
+```yaml
+# /resources/META-INF/descriptors/ContactTable.yml
+view: table
+beanClass: demo.Contact # nombre de clase completo
+autofields: false # desactiva inclusión automática de campos
+fields:
+  name:
+  email:
+  phone:
+  lastName:
+    label: Apellido
+  commnents:
+    label: Comentarios
+    params:
+       header:
+         align: left
+         width: 300px
+  id:
+    label: ID
+
+```
+
+### Vistas CRUD
+DynamiaTools provee vistas CRUD automáticas para las entidades. Simplemente definiendo una entidad y una página CRUD correspondiente en un módulo, el framework genera las vistas necesarias para listar, crear, editar y eliminar entidades. Las vistas CRUD pueden personalizarse usando descriptores de vista para formularios y tablas.
+
+### Otros tipos de vista
+DynamiaTools también soporta otros tipos de vista como árboles, gráficos y tableros. Cada tipo de vista tiene sus propias opciones de personalización y puede definirse usando descriptores de vista.
+
+### Renderizadores de Vista
+Los ViewRenderers son responsables de renderizar las vistas definidas en los descriptores. DynamiaTools provee renderizadores por defecto para formularios, tablas, árboles, configuración y otros, pero también puedes crear renderizadores personalizados para necesidades específicas de UI. Los renderizadores personalizados pueden registrarse en el framework y usarse en los descriptores de vista.
+
+<Card title="¿Qué es ZK?" icon="pencil">
+    ZK es un potente framework Java para construir aplicaciones web ricas. Ofrece una amplia gama de componentes de UI, binding de datos y manejo de eventos directamente desde Java. Por defecto, DynamiaTools utiliza ZK para renderizar la interfaz de usuario, permitiendo a los desarrolladores crear aplicaciones web modernas con facilidad.
+
+    Sin embargo, DynamiaTools no está limitado a ZK ni a ninguna tecnología frontend específica. Puedes crear tus propios ViewRenderers para usar otros frameworks como Vaadin, React, Angular, Flutter y más. La API de Metadata de Dynamia permite consultar metadatos de entidades y descriptores de vista desde cualquier framework frontend.
+</Card>
+
+### Personalizadores
+DynamiaTools ofrece varios puntos de extensión que permiten personalizar el comportamiento del framework. Los personalizadores son componentes Spring que implementan la interfaz `ViewCustomizer`. Se pueden usar para modificar los descriptores de vista antes de renderizarlos, agregar lógica de validación personalizada o implementar otros comportamientos.
+
+## Acciones
+DynamiaTools introduce el concepto de Acciones, que son componentes reutilizables que encapsulan funcionalidades o comportamientos específicos. Las acciones pueden ser disparadas por interacciones del usuario, como clics en botones o selecciones de menú, y pueden asociarse a varios componentes de UI. Las acciones promueven la reutilización de código y ayudan a mantener una separación clara de responsabilidades. Cualquier clase que implemente la interfaz `Action` o subclases como `AbstractAction`, `CrudAction`, etc. puede ser una acción. Las acciones se registran en el contexto Spring usando la anotación `@InstallAction` y el framework las descubre automáticamente.
+
+## Servicios
+Los servicios son componentes singleton que proveen funcionalidades o lógica de negocio específica. Pueden inyectarse en otros componentes usando el mecanismo de inyección de dependencias de Spring. Los servicios promueven la reutilización de código y ayudan a mantener una separación clara de responsabilidades. Cualquier clase anotada con `@Service` o `@Component` puede ser un servicio. Los servicios se registran en el contexto Spring y el framework los descubre automáticamente.
+
+## Utilidades
+DynamiaTools ofrece un conjunto completo de clases y métodos utilitarios diseñados para simplificar tareas comunes de desarrollo. Estas utilidades incluyen manipulación de cadenas (`StringUtils`), manejo de fechas y horas (`DateTimeUtils`), operaciones de archivos (`IOUtils`, `ImageUtils`), transformaciones DTO (`Transportable`), parseo de JSON (`StringPojoParser`), operaciones con BigDecimal (`BigDecimalUtils`) y más.
+
+Estas clases auxiliares son opcionales pero pueden mejorar significativamente la productividad y calidad del código en tu aplicación o servicio.

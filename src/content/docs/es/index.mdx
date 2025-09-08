@@ -1,0 +1,57 @@
+---
+title: DynamiaTools
+description: Framework Fullstack Java 21 para aplicaciones web empresariales, impulsado por Spring Boot 3.5 y ZK 10
+template: splash
+hero:
+    tagline: Un framework Java 21 full-stack de vanguardia diseñado para construir potentes aplicaciones web empresariales, aprovechando la fuerza de Spring Boot 3 y la elegancia de ZK 10.
+    image:
+        file: ../../../assets/dynamia-tools-splash.webp
+    actions:
+        - text: Comenzando
+          link: getting-started
+          icon: right-arrow
+        - text: Ver en Github
+          link: https://github.com/dynamiatools/framework
+          icon: external
+          variant: minimal
+---
+
+import {Card, CardGrid, LinkButton} from '@astrojs/starlight/components';
+
+<CardGrid stagger>
+    <Card title="¿Qué es?" icon="pencil">
+        DynamiaTools es un framework para construir aplicaciones web Java 21 de forma rápida y sencilla usando patrones de diseño estándar,
+        descriptores de vistas para generación automática de UI, acciones, servicios y módulos.
+
+        Impulsado por Spring Boot (https://spring.io), ZK (https://www.zkoss.org) para la interfaz web y JPA.
+    </Card>
+    <Card title="¿Qué puede hacer?" icon="add-document">
+        * Crear aplicaciones web full-stack.
+        * Escribir aplicaciones modulares. Sí, puedes crear un módulo (archivo jar) y reutilizarlo. Te ayuda a mantener tu
+        proyecto DRY.
+        * Vistas CRUD automáticas y endpoints REST para operaciones CRUD.
+        * Extiende el framework con nuevos módulos, acciones y servicios.
+        * Usa HTML5 en tu aplicación gracias al framework ZK, esto significa que puedes usar Bootstrap, CSS 3 y muchas tecnologías HTML5.
+        * Personaliza tu aplicación con temas o plantillas.
+        * Integra con otros frameworks Java y mucho más.
+    </Card>
+    <Card title="¿Es maduro?" icon="setting">
+        Sí, se utiliza en muchos proyectos en producción y está impulsado por los mejores frameworks del ecosistema Java:
+        * Spring framework para integración, REST e infraestructura.
+        * Spring Boot para configuración y despliegue sencillo.
+        * ZK framework para interfaces de usuario web.
+        * JPA estándar para la capa de persistencia por defecto.
+        * Jackson para serialización JSON/XML.
+        * YAML para descriptores de vistas.
+
+        <LinkButton href="/history" variant="secondary" >
+            Conoce nuestra historia
+        </LinkButton>
+    </Card>
+    <Card title="Lee la documentación" icon="open-book">
+        Comienza con la guía de [Comenzando](/getting-started) para empezar rápidamente. A medida que avances, explora temas avanzados
+        para profundizar tu conocimiento.
+
+        Personaliza tu aplicación, extiende el framework y construye tus propias soluciones innovadoras con DynamiaTools.
+    </Card>
+</CardGrid>
