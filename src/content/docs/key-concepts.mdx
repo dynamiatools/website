@@ -1,0 +1,216 @@
+---
+title: Key Concepts
+description: DynamiaTools key concepts
+---
+
+import {Card} from "@astrojs/starlight/components";
+
+DynamiaTools is built around several key concepts that facilitate the development of modular, maintainable, and scalable
+web applications. Understanding these concepts is crucial for effectively utilizing the framework.
+
+## Modules
+Modules are the fundamental building blocks of a DynamiaTools application. Each module encapsulates a distinct set of
+functionalities or features, promoting modularity, reusability, and separation of concerns. Modules can be developed,
+tested, and deployed independently, enabling scalable and maintainable application architectures.
+
+### Pages and Page Groups
+Pages serve as the primary navigation elements within a DynamiaTools application, each representing a unique view or screen.
+Pages are grouped into PageGroups, which act as containers for related pages, facilitating logical organization and
+streamlined navigation. This hierarchical structure simplifies UI management and enhances user experience.
+Modules function as routers, defining navigation rules and relationships between pages and page groups,
+ensuring cohesive application flow.
+
+### Module providers
+Modules are defined using Module Providers, which are Spring components that implement the `ModuleProvider` interface.
+The `getModule()` method returns a `Module` object that contains the module's ID, name, pages, and page groups.
+Modules are automatically discovered and registered by the framework at application startup
+
+**Example of a simple module provider defining a module with a single CRUD page*
+
+```java
+//ContactModuleProvider.java
+package demo;
+import org.springframework.stereotype.Component;
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+
+@Component
+public class ContactModuleProvider implements ModuleProvider {
+    @Override
+    public Module getModule() {
+               //can user chnained methods or builder pattern
+               Module module = new Module("customers", "Customers")
+                .addPageGroup(new PageGroup("page1", "The Page 1", "the/path/page")
+                        .addPage(new Page("page2", "The Page 2", "the/path/page"),
+                                new Page("page3", "The Page 3", "the/path/page"),
+                                new Page("page4", "The Page 4", "the/path/page")
+                        )
+                );
+
+               return module;
+    }
+}
+```
+}
+
+## Navigation
+DynamiaTools provides a robust navigation system that allows developers to define and manage the application's navigation
+structure. The `NavigationManager` is responsible for handling navigation events, managing the current page state,
+and facilitating transitions between pages. All modules, pages, and page groups are registered with the `ModuleContainer` and
+can be accessed through the `NavigationManager` using path-based navigation or using java objects like `Module`, `PageGroup` or `Page`.
+
+**example of navigating to a page using its path**
+```java
+NavigationManager.navigateTo("customers/crm/contacts");
+```
+Where `customers` is a module, `/crm` is a page group and `/contacts` is a page.
+
+
+## Entities
+
+Entities are the core data model of the application, typically mapped to database tables using JPA annotations.
+DynamiaTools streamlines data management by providing automatic CRUD (Create, Read, Update, Delete) operations for entities.
+
+### CRUD Operations
+
+DynamiaTools uses the `CrudService` interface to perform CRUD operations on entities. The framework offers a default implementation,
+`JpaCrudService`, which leverages JPA for data persistence. With this service, you do not need to create separate
+repositories or DAOs for your entities—everything is centralized and easy to use.
+
+## Views
+Views define the user interface of the application. DynamiaTools uses view descriptors, which are YAML files that describe
+the layout and components of the UI. This approach allows for rapid UI development without the need for extensive coding.
+
+### Forms
+Forms are a type of view used for data entry and editing. They are automatically generated based on entity definitions and can be customized using view descriptors.
+View descriptors for forms allow you to specify field layouts, component types, validation rules, and other UI behaviors in YAML file.
+
+**Minimal form view example**
+```yaml
+# /resources/META-INF/descriptors/ContactForm.yml
+view: form # required
+beanClass: demo.Contact # use fully qualified class name
+autofields: true # automatically include all entity fields
+```
+
+**Extended form view example**
+
+```yaml
+# /resources/META-INF/descriptors/ContactForm.yml
+view: form # required
+beanClass: demo.Contact # use fully qualified class name
+autofields: false # disable automatic fields inclusion
+fields:
+  name:
+  lastName:
+    label: Last Name
+    params:
+      placeholder: Enter last name here # component attribute
+
+
+  email:
+    label: Email Address
+    params:
+      span: 2 # span 2 columns in a 12-column grid layout controlled by layout.columns
+
+  phone:
+    label: Phone Number
+
+  commnents:
+    component: textbox
+    params:
+      multiline: true
+      height: 100px # component attribute from ZK Textbox
+      span: 2 # full width in a 12-column grid layout
+
+
+layout:
+  columns: 2
+```
+
+### Tables
+Tables are another type of view used for displaying lists of entities. Like forms, tables are automatically generated
+based on entity definitions and can be customized using view descriptors. View descriptors for tables allow you to specify
+which fields to display, sorting options, pagination settings, and other table behaviors in YAML file.
+
+**Minimal table view example**
+```yaml
+# /resources/META-INF/descriptors/ContactTable.yml
+view: table
+beanClass: demo.Contact # use fully qualified class name
+autofields: true # automatically include all entity fields
+```
+
+**Extended table view example**
+```yaml
+# /resources/META-INF/descriptors/ContactTable.yml
+view: table
+beanClass: demo.Contact # use fully qualified class name
+autofields: false # disable automatic fields inclusion
+fields:
+  name:
+  email:
+  phone:
+  lastName:
+    label: Last Name
+  commnents:
+    label: Comments
+    params:
+       header:
+         align: left
+         width: 300px
+  id:
+    label: ID
+
+```
+
+### Crud views
+DynamiaTools provides automatic CRUD views for entities. By simply defining an entity and a corresponding CRUD page in a module,
+the framework generates the necessary views for listing, creating, editing, and deleting entities. CRUD views can be customized using view descriptors for forms and tables.
+
+### Other view types
+DynamiaTools also supports other view types such as trees, charts, and dashboards. Each view type has its own set of customization options
+and can be defined using view descriptors.
+
+### View Renderers
+ViewRenderers are responsible for rendering the views defined in the view descriptors. DynamiaTools provides default renderers for
+forms, tables, trees, config and others, but you can also create custom renderers to meet specific UI requirements.
+Custom renderers can be registered with the framework and used in view descriptors.
+
+<Card title="What is ZK?" icon="pencil">
+    ZK is a powerful Java framework for building rich internet applications. It offers a wide range of UI components,
+    data binding, and event handling capabilities directly from Java. By default, DynamiaTools leverages ZK to render
+    the user interface, enabling developers to create modern web applications with ease.
+
+    However, DynamiaTools is not limited to ZK or any specific web frontend technology. You can create your own
+    ViewRenderers to use other frontend frameworks such as Vaadin, React, Angular, Flutter, and more. The Dynamia
+    Metadata API allows you to query entity metadata and view descriptors from any frontend framework.
+</Card>
+
+
+### Customizers
+DynamiaTools provides several extension points that allow you to customize the behavior of the framework. Customizers are Spring components that implement
+the `ViewCustomizer` interface. They can be used to modify the view descriptors before they are rendered, add custom validation logic, or implement other custom behaviors.
+
+## Actions
+DynamiaTools introduces the concept of Actions, which are reusable components that encapsulate specific functionalities or
+behaviors. Actions can be triggered by user interactions, such as button clicks or menu selections, and can be associated with
+various UI components. Actions promote code reuse and help maintain a clean separation of concerns. Any class that implements
+the `Action` interface or any subclass like `AbstractAction`, `CrudAction`, etc. could be an action. Actions are registered
+in the Spring context using `@InstallAction` annotation and automatically discovered by the framework.
+
+## Services
+
+Services are singleton components that provide specific functionalities or business logic. They can be injected into other
+components using Spring's dependency injection mechanism. Services promote code reuse and help maintain a clean separation of
+concerns. Any class annotated with `@Service` or `@Component` could be a service. Services are registered in the Spring context
+and automatically discovered by the framework.
+
+## Utilities
+
+DynamiaTools offers a comprehensive set of utility classes and methods designed to simplify common development tasks.
+These utilities include string manipulation (`StringUtils`), date and time handling (`DateTimeUtils`), file operations (`IOUtils`, `ImageUtils`),
+DTO transformations (`Transportable`), JSON parsing (`StringPojoParser`), BigDecimal operations (`BigDecimalUtils`), and more.
+
+These helper classes are optional but can significantly enhance productivity and code quality in your application or service.

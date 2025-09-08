@@ -1,7 +1,7 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-export const dynamiaToolsVersion = '5.2.0-beta'
+export const dynamiaToolsVersion = '5.4.5'
 
 
 // https://astro.build/config
@@ -43,6 +43,7 @@ export default defineConfig({
                     },
                     items: [
                         'getting-started',
+                        'key-concepts',
                         'custom-setup'
                     ]
                 },
