@@ -27,9 +27,9 @@ export default defineConfig({
             editLink: {
                 baseUrl: 'https://github.com/dynamiatools/website',
             },
-            social: {
-                github: 'https://github.com/dynamiatools/framework',
-            },
+            social: [
+                {icon: 'github', label: 'GitHub', href: 'https://github.com/dynamiatools/framework'}
+            ],
 
             locales: {
                 root: {label: 'English', lang: 'en'},
