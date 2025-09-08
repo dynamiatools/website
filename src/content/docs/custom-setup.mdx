@@ -2,4 +2,97 @@
 title: Custom Setup
 ---
 
-TODO
+The standard setup using the Spring Boot starter works for most users, but if you need more control over the configuration, you can use a custom setup.
+To create a custom setup, follow these steps:
+
+You can add only the dependencies you need to your `pom.xml`. For example, if you only need the domain-jpa module:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.domain-jpa</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+Suppose you have a multi-module project with the following structure:
+
+```
+my-app
+  ├── core
+  ├── ui
+  ├── boot
+  └── pom.xml
+```
+
+The `core` module could contain only domain-related dependencies:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.domain-jpa</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.integration</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+The `ui` module could contain only UI-related dependencies:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.crud</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+And the `boot` module could contain the Spring Boot-related dependencies:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.app</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+Finally, in your main application class, you need to enable Dynamia by adding the `@EnableDynamiaTools` annotation:
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import tools.dynamia.app.EnableDynamiaTools;
+
+@SpringBootApplication
+@EnableDynamiaTools // <- this is all you need
+public class MyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+
+}
+```
+
+You can provide custom configuration in your `application.yml` or `application.properties` file:
+
+```yaml
+spring:
+  dynamia:
+    app:
+      base-package: com.mycompany.myapp
+      name: My Application
+      version: @project.version@
+```
+
+### Additional Tips
+
+- Make sure to use the correct version for each dependency.
+- You can further customize your modules by adding or removing dependencies as needed.
+- For advanced configuration, refer to the official Dynamia documentation.
+- DynamiaTools is a typical Spring Boot application, so you can use all Spring Boot features and configurations.

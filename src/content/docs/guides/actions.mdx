@@ -1,6 +1,15 @@
 ---
-title: Actions
+title: How Actions Work
 
 ---
 
-TODO
+Actions are a core concept in DynamiaTools, providing a way to encapsulate behavior and logic that can be reused across different parts of an application. They are designed to be flexible and can be associated with various UI components, such as buttons, menu items, or context menus.
+
+## Defining Actions
+To define an action, you typically create a class that extends `AbstractAction` or implements the `Action` interface. Here's a simple example of an action that prints a message to the console:
+
+```java
+import tools.dynamia.actions.AbstractAction;
+import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.actions.Action;
+

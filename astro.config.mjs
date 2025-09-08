@@ -20,7 +20,17 @@ export default defineConfig({
                 dark: './src/assets/dynamia-tools-dark.svg',
                 replacesTitle: true,
             },
-            favicon: './src/assets/favicon.png',
+            favicon: '/images/favicon.png',
+            head: [
+                {
+                    tag: 'link',
+                    attrs: {
+                        rel: 'icon',
+                        href: '/images/favicon.png',
+                        sizes: '32x32',
+                    },
+                },
+            ],
             customCss: [
                 './src/styles/custom.css'
             ],
