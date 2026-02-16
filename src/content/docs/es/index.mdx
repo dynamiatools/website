@@ -1,9 +1,9 @@
 ---
-title: DynamiaTools
-description: Framework Fullstack Java 21 para aplicaciones web empresariales, impulsado por Spring Boot 3.5 y ZK 10
+title: Dynamia Platform
+description: Framework full-stack Java 25 para aplicaciones web empresariales impulsado por Spring Boot 4 y ZK 10
 template: splash
 hero:
-    tagline: Un framework Java 21 full-stack de vanguardia diseñado para construir potentes aplicaciones web empresariales, aprovechando la fuerza de Spring Boot 3 y la elegancia de ZK 10.
+    tagline: La próxima generación de DynamiaTools. Un framework Java 25 full-stack de vanguardia diseñado para construir aplicaciones web empresariales robustas y escalables, impulsado por Spring Boot 4 y ZK 10.
     image:
         file: ../../../assets/dynamia-tools-splash.webp
     actions:
@@ -17,41 +17,71 @@ hero:
 ---
 
 import {Card, CardGrid, LinkButton} from '@astrojs/starlight/components';
+import {dynamiaToolsVersion} from '../../../../astro.config.mjs';
+
+export const version = dynamiaToolsVersion;
 
 <CardGrid stagger>
-    <Card title="¿Qué es?" icon="pencil">
-        DynamiaTools es un framework para construir aplicaciones web Java 21 de forma rápida y sencilla usando patrones de diseño estándar,
-        descriptores de vistas para generación automática de UI, acciones, servicios y módulos.
+    <Card title="¿Qué es Dynamia Platform?" icon="pencil">
+        **Dynamia Platform** es la próxima generación de DynamiaTools—un framework unificado con baterías incluidas para construir aplicaciones web empresariales en Java 25 de forma rápida y sencilla usando patrones de diseño estándar, descriptores de vistas para generación automática de UI, acciones, servicios y módulos.
 
-        Impulsado por Spring Boot (https://spring.io), ZK (https://www.zkoss.org) para la interfaz web y JPA.
+        Impulsado por **Spring Boot 4** (https://spring.io), **ZK 10** (https://www.zkoss.org) para generación automática de interfaces web, y **JPA** para persistencia de datos.
+
+        Ahora con **versionado CalVer** (AA.MM.MENOR) y todos los módulos unificados en una sola versión: **{version}** (Febrero 2026).
     </Card>
     <Card title="¿Qué puede hacer?" icon="add-document">
-        * Crear aplicaciones web full-stack.
-        * Escribir aplicaciones modulares. Sí, puedes crear un módulo (archivo jar) y reutilizarlo. Te ayuda a mantener tu
-        proyecto DRY.
-        * Vistas CRUD automáticas y endpoints REST para operaciones CRUD.
-        * Extiende el framework con nuevos módulos, acciones y servicios.
-        * Usa HTML5 en tu aplicación gracias al framework ZK, esto significa que puedes usar Bootstrap, CSS 3 y muchas tecnologías HTML5.
-        * Personaliza tu aplicación con temas o plantillas.
-        * Integra con otros frameworks Java y mucho más.
+        * **Construir aplicaciones web full-stack** con generación automática de UI
+        * **Escribir aplicaciones modulares** - Crea módulos (archivos JAR) y reutilízalos en múltiples proyectos (principio DRY)
+        * **Vistas CRUD y endpoints REST automáticos** - Cero código requerido para operaciones estándar
+        * **Extensiones empresariales listas** - Multi-tenencia (SaaS), reportes, dashboards, email/SMS, seguridad y más
+        * **Extender el framework** con módulos, acciones y servicios personalizados
+        * **Soporte HTML5 moderno** vía framework ZK - Usa Bootstrap, CSS3 y tecnologías HTML5
+        * **Personalizar con temas y plantillas** - Sistema de tematización enchufable
+        * **Integración perfecta** con cualquier framework o librería Java
     </Card>
-    <Card title="¿Es maduro?" icon="setting">
-        Sí, se utiliza en muchos proyectos en producción y está impulsado por los mejores frameworks del ecosistema Java:
-        * Spring framework para integración, REST e infraestructura.
-        * Spring Boot para configuración y despliegue sencillo.
-        * ZK framework para interfaces de usuario web.
-        * JPA estándar para la capa de persistencia por defecto.
-        * Jackson para serialización JSON/XML.
-        * YAML para descriptores de vistas.
+    <Card title="¿Es maduro y está listo para producción?" icon="setting">
+        **¡Absolutamente!** Dynamia Platform tiene **más de 13 años** de desarrollo continuo e impulsa **más de 10 proyectos en producción** con **más de 40 módulos empresariales** en entornos del mundo real.
 
-        <LinkButton href="/history" variant="secondary" >
+        Construido sobre los mejores frameworks del ecosistema Java:
+        * **Spring Boot 4** para infraestructura moderna y despliegue sencillo
+        * **Java 25** - Últimas innovaciones y rendimiento
+        * **ZK 10** para generación automática de interfaces de usuario web
+        * **JPA** para capa de persistencia estándar
+        * **Jackson** para serialización JSON/XML
+        * **YAML** para descriptores de vistas declarativos
+
+        <LinkButton href="/es/history" variant="secondary">
             Conoce nuestra historia
         </LinkButton>
     </Card>
-    <Card title="Lee la documentación" icon="open-book">
-        Comienza con la guía de [Comenzando](/getting-started) para empezar rápidamente. A medida que avances, explora temas avanzados
-        para profundizar tu conocimiento.
+    <Card title="¿Qué hay de nuevo en v26?" icon="star">
+        La **serie 26.x** trae mejoras importantes:
 
-        Personaliza tu aplicación, extiende el framework y construye tus propias soluciones innovadoras con DynamiaTools.
+        * 📅 **Versionado CalVer** - Todos los módulos comparten la misma versión ({version})
+        * ☕ **Java 25** - Últimas características y rendimiento del JVM
+        * 🚀 **Spring Boot 4** - Ecosistema Spring de próxima generación
+        * 🏢 **Repositorio Unificado** - Core + Extensiones juntos
+        * 📦 **Extensiones Integradas** - SaaS, reportes, dashboard, seguridad, email/SMS, gestión de archivos
+        * ⚡ **Filosofía Zero-Config** - Valores predeterminados sensatos con fácil personalización
+        * 🛡️ **Nivel Empresarial** - Multi-tenencia, seguridad y escalabilidad
+
+        Todo impulsado por una plataforma **probada en producción** utilizada por empresas en América Latina y Europa.
+    </Card>
+    <Card title="Inicio Rápido" icon="rocket">
+        Comienza en minutos:
+
+        1. Crea un proyecto Spring Boot 4 + Java 25
+        2. Agrega la dependencia `tools.dynamia.app:{version}`
+        3. Agrega la anotación `@EnableDynamiaTools`
+        4. ¡Ejecuta y disfruta tu aplicación full-stack!
+
+        Lee la guía de [Comenzando](/es/getting-started) para instrucciones detalladas y ejemplos.
+    </Card>
+    <Card title="Lee la documentación" icon="open-book">
+        Comienza con la guía de [Comenzando](/es/getting-started) para ponerte en marcha rápidamente. Aprende sobre [Conceptos Clave](/es/key-concepts) y explora temas avanzados para profundizar tu conocimiento.
+
+        Descubre las **extensiones empresariales integradas**, personaliza tu aplicación, extiende el framework y construye soluciones innovadoras con **Dynamia Platform**.
+
+        **Próximamente**: SDK de TypeScript, plantillas Vue/React, documentación mejorada, ¡y más!
     </Card>
 </CardGrid>

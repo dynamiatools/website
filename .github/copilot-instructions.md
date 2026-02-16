@@ -2,7 +2,9 @@
 
 ## Project Overview
 
-This is the official documentation website for **DynamiaTools** (https://dynamia.tools), a full-stack Java 25 framework for building enterprise web applications powered by Spring Boot 4, ZK 10 and frontend libraries.
+This is the official documentation website for **Dynamia Platform** (https://dynamia.tools), the next generation of DynamiaTools. It's a cutting-edge full-stack Java 25 framework for building enterprise web applications powered by Spring Boot 4 and ZK 10.
+
+**Current Version**: 26.2.0 (CalVer: YY.MM.MINOR - February 2026)
 
 The website is built using:
 - **Astro** (v5.17.2+) - Static site generator
@@ -37,7 +39,10 @@ website/
 ## Key Configuration
 
 ### Framework Version
-- Current DynamiaTools version is defined in `astro.config.mjs` as `dynamiaToolsVersion`
+- Current Dynamia Platform version: **26.2.0** (CalVer format: YY.MM.MINOR)
+- Version is defined in `astro.config.mjs` as `dynamiaToolsVersion`
+- CalVer means: Year 26 (2026), Month 02 (February), Release 0
+- All Dynamia Platform modules share the same version (unified versioning)
 - When updating framework version, update this constant
 
 ### Site Configuration
@@ -62,13 +67,14 @@ All documentation files should:
    - `Code` for syntax highlighting
 
 ### Code Examples
-When writing code examples for DynamiaTools:
+When writing code examples for Dynamia Platform:
 - Use **Java 25** syntax and features
 - Include relevant **Spring Boot 4** annotations
 - Show **JPA/Jakarta Persistence** annotations (not javax.*)
 - Reference **ZK 10** components when applicable
 - Include package declarations and imports
 - Add comments to explain key concepts
+- When mentioning versions, use CalVer format (e.g., 26.2.0)
 
 Example format:
 ```java
@@ -105,7 +111,9 @@ autofields: true
 ```
 
 ### Framework Concepts to Document
-Key DynamiaTools concepts to explain clearly:
+Key Dynamia Platform concepts to explain clearly:
+- **CalVer Versioning** - Calendar-based versioning (YY.MM.MINOR)
+- **Unified Repository** - Core + Extensions in one place
 - **Modules** and ModuleProvider
 - **Pages** and PageGroups
 - **Navigation** system
@@ -114,6 +122,8 @@ Key DynamiaTools concepts to explain clearly:
 - **View Descriptors** (forms, tables)
 - **Actions** and ActionEvent
 - **Templates** and themes
+- **Enterprise Extensions** - SaaS, reporting, dashboard, security, email/SMS, file management
+- **@EnableDynamiaTools** annotation
 
 ## Styling
 
@@ -172,9 +182,10 @@ npm run astro check  # Type check
 3. Follow existing patterns for structure
 
 ### Updating Framework Version
-1. Update `dynamiaToolsVersion` in `astro.config.mjs`
+1. Update `dynamiaToolsVersion` in `astro.config.mjs` (e.g., from 26.2.0 to 26.3.0)
 2. Update any version references in documentation
 3. Update code examples if API changed
+4. Remember: All Dynamia Platform modules share the same CalVer version
 
 ### Adding Images
 1. Place images in `src/assets/` for optimized processing
@@ -194,10 +205,11 @@ npm run astro check  # Type check
 4. **Mobile Friendly**: Starlight handles this, but test complex layouts
 5. **Accessibility**: Use semantic HTML and proper alt text
 6. **SEO**: Write descriptive titles and descriptions
-7. **Version Awareness**: Specify which DynamiaTools version features require
+7. **Version Awareness**: Specify which Dynamia Platform version features require (use CalVer format)
 8. **Cross-reference**: Link related concepts together
 9. **Update Both Languages**: When adding English content, plan for Spanish translation
 10. **Test Locally**: Always run `npm run dev` to preview changes
+11. **CalVer Consistency**: When mentioning versions, always use YY.MM.MINOR format (e.g., 26.2.0)
 
 ## External Resources
 
@@ -227,5 +239,7 @@ Before committing documentation changes:
 - [ ] Mobile-friendly layout
 - [ ] Accessible to screen readers
 - [ ] Spanish translation planned/added (if applicable)
-- [ ] Framework version requirements noted (if applicable)
+- [ ] Framework version requirements noted using CalVer format (if applicable)
+- [ ] References to "DynamiaTools" updated to "Dynamia Platform" where appropriate
+- [ ] Java 25 and Spring Boot 4 mentioned correctly
 
