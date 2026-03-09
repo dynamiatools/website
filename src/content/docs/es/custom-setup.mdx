@@ -1,0 +1,99 @@
+---
+title: Configuracion Personalizada
+---
+
+La configuracion estandar con el starter de Spring Boot funciona para la mayoria de usuarios, pero si necesitas mas control,
+puedes usar una configuracion personalizada.
+
+Puedes agregar solo las dependencias que necesites en tu `pom.xml`. Por ejemplo, si solo necesitas `domain-jpa`:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.domain-jpa</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+Supongamos que tienes un proyecto multi-modulo con esta estructura:
+
+```
+my-app
+  ├── core
+  ├── ui
+  ├── boot
+  └── pom.xml
+```
+
+El modulo `core` podria tener solo dependencias de dominio:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.domain-jpa</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.integration</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+El modulo `ui` podria tener solo dependencias de interfaz:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.crud</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+Y el modulo `boot` podria tener dependencias de arranque:
+
+```xml
+<dependency>
+    <groupId>tools.dynamia</groupId>
+    <artifactId>tools.dynamia.app</artifactId>
+    <version>LATEST_VERSION</version>
+</dependency>
+```
+
+Finalmente, en tu clase principal debes habilitar Dynamia con `@EnableDynamiaTools`:
+
+```java
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import tools.dynamia.app.EnableDynamiaTools;
+
+@SpringBootApplication
+@EnableDynamiaTools // <- esto es todo lo que necesitas
+public class MyApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(MyApplication.class, args);
+    }
+
+}
+```
+
+Tambien puedes agregar configuracion personalizada en `application.yml` o `application.properties`:
+
+```yaml
+spring:
+  dynamia:
+    app:
+      base-package: com.mycompany.myapp
+      name: My Application
+      version: @project.version@
+```
+
+## Consejos adicionales
+
+- Usa la version correcta para cada dependencia.
+- Puedes personalizar cada modulo agregando o removiendo dependencias segun tu arquitectura.
+- Para configuraciones avanzadas, consulta la documentacion oficial de Dynamia.
+- Dynamia Platform es una aplicacion Spring Boot estandar, asi que puedes aprovechar todo el ecosistema Spring.
+

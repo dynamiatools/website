@@ -3,42 +3,50 @@ title: History
 description: DynamiaTools history
 ---
 
-We started developing DynamiaTools in 2008, 16 years ago, as an internal utility library for our projects
+We started developing DynamiaTools in 2008, more than 18 years ago, as an internal utility library for our projects
 at [Dynamia Soluciones IT](https://www.dynamiasoluciones.com). We needed a way for our developers to create web
 applications quickly without requiring extensive knowledge of specific frameworks or APIs like Spring or JPA.
 
 ## 1.x
 
-The first version focused on many utility classes for hiding Spring complexity, ZK APIs, database connections, project
-configuration, page navigation, services, domain code integration, and reusable simple modules. We found ourselves repeating t
-he same tasks to create consistent user interfaces and actions across modules.
+The first version focused on utility classes to hide Spring complexity, ZK APIs, database connections, project
+configuration, page navigation, services, domain integration, and reusable simple modules. We found ourselves repeating the
+same tasks to create consistent user interfaces and actions across modules.
 
 ## 2.x
 
 In version 2.x, we aimed to simplify and automate user interface creation without generating code (which we found easy to
-use but very hard to maintain). We introduced something called view descriptors. Instead of writing UI code and layout
-components, you simply describe them using a plain YAML file, and the framework does its best to create the UI for you.
-Additionally, CRUD operations—common in applications that use data storage—were automated. DynamiaTools creates beautiful
-CRUDs for you; you just need to create an entity, and you're done.
+start with but very hard to maintain). We introduced view descriptors. Instead of writing UI code and layout
+components, you describe them using plain YAML files, and the framework builds the UI for you.
+Additionally, CRUD operations were automated. You just create an entity and the platform generates the standard
+management screens.
 
 ## 3.x
 
-With version 3.x, we reorganized, repackaged, and optimized everything. This version features better code, improved design,
-enhanced performance, and new, great features. It is not backwards compatible and, most importantly, it is the first version
-to be open source. Yes, we want to share our work with you.
+With version 3.x, we reorganized, repackaged, and optimized everything. This version introduced better code, improved
+design, enhanced performance, and important new features. It was not backward compatible and, most importantly, it became
+the first open-source version.
 
 ## 4.x
 
-Version 4.x focused on supporting Java 11 and beyond, increasing performance, integrating new frameworks, and writing much
-better documentation and demos.
+Version 4.x focused on Java 11+, performance improvements, integration with newer frameworks, and much better
+documentation and demos.
 
 ## 5.x
 
-The current branch focuses on the latest Java versions (17 and 21), Spring Boot 3, ZK 10, improved REST support,
+Version 5.x consolidated the platform era with Java 17/21, Spring Boot 3, ZK 10, improved REST support,
 and better frontend framework integration.
 
-Please use it, extend it, and help us build a great community around it. We will continue to support this project indefinitely.
-Currently, we have more than 10 projects and over 50 modules powered by DynamiaTools 5. As you can see, this is not a new
-framework, but it is new to the open-source world. This is not the only project we plan to open; we have more products to share.
+## 26.x
 
+Version 26.x is the current generation and introduces a major modernization cycle:
 
+- Java 25 and Spring Boot 4 as the new baseline.
+- CalVer versioning (`YY.MM.MINOR`), replacing traditional semantic version progression.
+- Unified versions across core, extensions, starters, and themes.
+- Synchronized releases that simplify dependency management and compatibility.
+- Better performance and readiness for modern cloud and frontend ecosystems.
+
+Please use it, extend it, and help us build a great community around it. We will continue supporting this project for the
+long term. Today, DynamiaTools powers more than 10 projects and over 50 modules. As you can see, this is not a new
+framework; it is a mature platform that is now fully open to the community.

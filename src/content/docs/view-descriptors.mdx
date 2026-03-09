@@ -1,0 +1,770 @@
+---
+title: View Descriptors
+description: View descriptors are YAML files that define how an entity is presented and behaves in the user interface.
+---
+
+**View descriptors** are YAML files that define how an entity is displayed and behaves in the user interface. They remove the need to write ZUL views manually for standard CRUD operations by delegating configuration to the Dynamia Tools descriptor engine.
+
+---
+
+## Location
+
+```
+<module>/ui/src/main/resources/META-INF/descriptors/
+```
+
+> In some cases, they can also be placed in `core/` when the descriptor does not depend on UI components (for example, `*Json.yml`).
+
+---
+
+## General Descriptor Structure
+
+Every descriptor starts with a header that identifies the view type and the associated entity:
+
+```yaml
+view: <type>                         # View type (required)
+id: <identifier>                     # Unique ID (optional, defaults to filename)
+beanClass: com.example.Entity        # Entity Java class (required in most cases)
+controller: com.example.Controller   # Custom CrudController (optional)
+customizer: com.example.Customizer   # Form customizer (optional)
+autofields: false                    # If true, engine generates fields automatically
+```
+
+---
+
+## View Types (`view`)
+
+| Type           | File Suffix            | Description                                                       |
+|----------------|------------------------|-------------------------------------------------------------------|
+| `crud`         | `*Crud.yml`            | Full view (table + form integrated)                               |
+| `form`         | `*Form.yml`            | Create/edit form                                                  |
+| `table`        | `*Table.yml`           | Listing table                                                     |
+| `entitypicker` | `*Picker.yml`          | Entity selector for reference fields                              |
+| `entityfilters`| `*Filters.yml`         | Search filters for table or CRUD                                  |
+| `export`       | `*Export.yml`          | Fields to export (Excel, CSV, etc.)                               |
+| `config`       | `*Config.yml`          | Module configuration parameters form                              |
+| `json`         | `*Json.yml`            | JSON representation of the entity (for APIs, webhooks, etc.)      |
+| `tree`         | `*Tree.yml`            | Tree view for hierarchical entities                               |
+
+---
+
+## `fields` Section
+
+Defines the fields shown in the view. Each field is named after the Java entity attribute. If left empty (`name:`), default engine values are used.
+
+```yaml
+fields:
+
+  name:                              # Simple field, uses default label and type
+
+  price:
+    label: Sale Price                # Custom label
+    description: Only values >= 0    # Helper text below field
+    component: textbox               # Explicit UI component
+    required: true                   # Required field
+    visible: false                   # Hide field (useful for undesired inherited fields)
+    params:
+      span: 2                        # Occupies 2 layout columns
+      span-sm: 12                    # Full width on small screens
+      readonly: true                 # Read-only
+      multiline: true                # Textarea (for strings)
+      height: 100px                  # Textarea height
+      placeholder: Type here...      # Placeholder text
+      format: '#,##0.##'             # Numeric format
+      constraint: 'no negative: only positive values'  # Validation
+      newRow: true                   # Force new row
+      style: 'color: red'            # Inline CSS
+      sclass: orange lighten-5       # CSS class
+      width: 100px                   # Component width
+```
+
+### Accessing Nested Properties
+
+Use dot notation. The engine resolves navigation automatically:
+
+```yaml
+fields:
+  manufacturer.name:       # Accesses item.getManufacturer().getName()
+    label: Manufacturer
+  contactData.email:
+    label: Email
+  city.department.country.name:
+    label: Country
+```
+
+---
+
+## Field Components (`component`)
+
+| Component              | Description                                                                 |
+|------------------------|-----------------------------------------------------------------------------|
+| `textbox`              | Simple text box                                                             |
+| `intbox`               | Numeric box for integers                                                    |
+| `spinner`              | Numeric spinner with range validation                                       |
+| `combobox`             | Dropdown list                                                               |
+| `entitypicker`         | Entity selector with search (reference to another entity)                   |
+| `entityrefpicker`      | Entity selector by reference field (foreign key by non-ID field)            |
+| `entityreflabel`       | Label that shows the name of an entity referenced by ID                     |
+| `crudview`             | Embedded CRUD table (for `@OneToMany` collections/relations)                |
+| `coollabel`            | Composite label with image, title, subtitle, and description                |
+| `entityfileImage`      | Image preview stored in `entityfile`                                        |
+| `link`                 | Table cell as a link that triggers an action                                |
+| `enumiconimage`        | Shows an icon or CSS class based on enum value                              |
+| `printerCombobox`      | System printer selector                                                     |
+| `cuentacontablepicker` | Accounting account selector with code binding                               |
+| `providermultipickerbox` | Multi-selector fed by a Spring `Provider`                                |
+
+### Usage Examples
+
+**`coollabel`** -- Composite card with image and text:
+```yaml
+products:
+  component: coollabel
+  params:
+    header:
+      width: 450px
+    bindings:
+      imageURL: photoURL          # Entity property containing image URL
+      title: name                 # Main title
+      subtitle: lineName          # Subtitle
+      description: type.name      # Description (bottom line)
+      tooltiptext: description    # Tooltip on hover
+```
+
+**`entityfileImage`** -- Uploaded image preview:
+```yaml
+photoPreview1:
+  label: Preview
+  component: entityfileImage
+  params:
+    bind: photo1
+    thumbnail: true
+    thumbnailWidth: 100
+    thumbnailHeight: 100
+    style: 'max-width: 100px; max-height: 100px'
+```
+
+**`crudview`** -- Embedded CRUD table for collections:
+```yaml
+subitems:
+  component: crudview
+
+features:
+  component: crudview
+  params:
+    controller: com.example.FeatureItemController  # Specific controller
+```
+
+**`entityreflabel`** -- Reference label by ID:
+```yaml
+salesTaxId:
+  label: Tax
+  component: entityreflabel
+  params:
+    header:
+      width: 100px
+```
+
+**`entityrefpicker`** -- Selector by non-ID reference field:
+```yaml
+identificationTypeId:
+  label: Type
+  component: entityrefpicker
+  required: true
+  params:
+    entityAlias: IdentificationType
+```
+
+**`link`** -- Link that triggers an action:
+```yaml
+serialDesc:
+  label: Serial
+  component: link
+  action: ViewSerialsDM       # Registered action name
+  params:
+    header:
+      align: center
+```
+
+**`enumiconimage`** -- Icon based on enum value:
+```yaml
+movement.type:
+  label: Type
+  component: enumiconimage
+  params:
+    iconsNamesValues:
+      - up|text-success        # value|css-class
+      - down|text-danger
+    header:
+      align: center
+```
+
+**`providermultipickerbox`** -- Multi-selector from Provider:
+```yaml
+responsibilities:
+  component: providermultipickerbox
+  params:
+    className: com.example.ResponsibilityProvider
+    idField: code
+    nameField: name
+```
+
+**`cuentacontablepicker`** -- Accounting account selector:
+```yaml
+accountingCode:
+  label: Income Account
+  component: cuentacontablepicker
+  params:
+    bindings:
+      codigo: accountingCode    # Maps picker's 'codigo' to entity 'accountingCode'
+```
+
+---
+
+## Header and Cell Styling in Tables
+
+Fields in `table` and `entityfilters` views support per-column style settings:
+
+```yaml
+totalStock:
+  label: Stock
+  params:
+    converter: converters.Decimal
+    header:
+      align: center             # Header alignment: left | center | right
+      width: 120px              # Fixed column width
+      sclass: green color-white # Header CSS classes
+    cell:
+      sclass: green lighten-5   # Data cell CSS classes
+    footer:
+      function: sum             # Aggregate function: sum | count | avg | max | min
+      functionConverter: converters.Decimal
+```
+
+---
+
+## Common Converters
+
+`converter` transforms values when rendering in tables:
+
+| Converter                   | Description                                |
+|----------------------------|--------------------------------------------|
+| `converters.Currency`      | Currency format with symbol and separators |
+| `converters.CurrencySimple`| Currency without symbol                    |
+| `converters.Decimal`       | Decimal number with separators             |
+| `converters.Date`          | Formatted date (no time)                   |
+| `converters.DateTime`      | Formatted date and time                    |
+
+---
+
+## `layout` Section
+
+Configures form column count:
+
+```yaml
+layout:
+  columns: 4    # Number of grid columns (default varies by view type)
+```
+
+---
+
+## `groups` Section
+
+Groups form fields into collapsible or labeled sections:
+
+```yaml
+groups:
+
+  salesConfiguration:             # Group ID (used as i18n key by default)
+    label: Sales Configuration    # Visible label (optional; generated from ID if omitted)
+    collapse: true                # Group collapsed by default
+    fields:
+      - minSalePrice
+      - salePrice2
+      - sellable
+      - allowsDiscounts
+
+  photos:
+    label: Images and Video
+    collapse: true
+    fields: [ photo1, photoPreview1, photo2, photoPreview2 ]   # Compact list syntax
+```
+
+> **Note:** Fields listed in `groups` are removed from default position and rendered in the group section.
+
+---
+
+## `actions` Section
+
+Controls availability and attributes of standard CRUD actions:
+
+```yaml
+actions:
+
+  FindAction:
+    attributes:
+      searchFields: [ code, name, reference ]   # Fields used by quick search
+
+  NewAction:
+    enabled: false        # Disable action
+
+  EditAction:
+    enabled: false
+
+  DeleteAction:
+    enabled: false
+
+  FilterAction:
+    enabled: false
+
+  ExportAction:
+    enabled: false
+
+  ExportCSVAction:
+    enabled: false
+
+  ImportThirdPartiesRef:  # Custom actions can also be controlled here
+    enabled: false
+```
+
+---
+
+## `params` Section
+
+Global view parameters:
+
+```yaml
+params:
+  orderBy: name             # Default sort field
+  pageSize: 50              # Records per page
+  span: true                # Table uses full available width
+  sizedByContent: true      # Columns fit content
+  writable: true            # Inline editable table (for embedded tables)
+  visibleActions: 15        # Number of visible toolbar actions
+  parameterClass: tools.dynamia.modules.saas.jpa.AccountParameter  # For config views
+```
+
+---
+
+## `crud` Descriptor -- Full View
+
+The `*Crud.yml` descriptor combines table and form in one view. It only needs `beanClass` and optionally a custom `controller`. The engine automatically uses the matching `*Form.yml` and `*Table.yml`.
+
+**Example: `ItemInventarioCrud.yml`**
+```yaml
+view: crud
+beanClass: com.dynamiasoluciones.modules.inventario.domain.ItemInventario
+controller: com.dynamiasoluciones.modules.inventario.ui.controllers.ItemInventarioCrudController
+autofields: false
+
+actions:
+  FindAction:
+    attributes:
+      searchFields: [ code, name, reference, barCode, mainLine.name, type.name ]
+  ExportAction:
+    enabled: false
+  ExportCSVAction:
+    enabled: false
+
+params:
+  visibleActions: 15
+```
+
+**Example: `ClienteCrud.yml`**
+```yaml
+view: crud
+beanClass: com.dynamiasoluciones.modules.ventas.domain.Cliente
+controller: com.dynamiasoluciones.modules.ventas.ui.controllers.ClienteCrudController
+autofields: false
+
+actions:
+  ImportThirdPartiesRef:
+    enabled: false
+  FindAction:
+    attributes:
+      searchFields: [identification, firstName, lastName]
+```
+
+---
+
+## `form` Descriptor -- Edit Form
+
+Defines editable fields and layout for create/edit form.
+
+**Typical structure:**
+```yaml
+view: form
+beanClass: com.example.Entity
+customizer: com.example.EntityFormCustomizer   # Dynamic UI logic (optional)
+autofields: false
+
+layout:
+  columns: 4
+
+fields:
+  name:
+    params:
+      span: 2
+
+  price:
+    params:
+      format: '#,##0.##'
+      constraint: 'no negative: only positive values'
+
+  description:
+    params:
+      span: 4
+      multiline: true
+      height: 100px
+
+groups:
+  configuration:
+    collapse: true
+    fields:
+      - active
+      - visible
+```
+
+---
+
+## `table` Descriptor -- Listing Table
+
+Defines visible columns in CRUD listing table.
+
+**Fragment from `ItemInventarioTable.yml`:**
+```yaml
+view: table
+beanClass: com.dynamiasoluciones.modules.inventario.domain.ItemInventario
+autofields: false
+
+fields:
+  products:
+    component: coollabel
+    params:
+      header:
+        width: 450px
+      bindings:
+        imageURL: photoURL
+        title: name
+        subtitle: lineName
+        description: type.name
+
+  salePrice:
+    params:
+      converter: converters.Currency
+      header:
+        align: right
+        sclass: orange color-white
+      cell:
+        sclass: orange lighten-5
+
+params:
+  orderBy: name
+  pageSize: 50
+  span: true
+  sizedByContent: true
+```
+
+---
+
+## `entitypicker` Descriptor -- Entity Selector
+
+Used when a form needs to select an entity from a search popup.
+
+**Example: `ItemInventarioPicker.yml`**
+```yaml
+view: entitypicker
+beanClass: com.dynamiasoluciones.modules.inventario.domain.ItemInventario
+autofields: false
+
+fields:
+  code:
+  name:
+  reference:
+  salePrice:
+    params:
+      converter: converters.CurrencySimple
+      searcheable: false
+      header:
+        align: right
+```
+
+**Example: `ClientePicker.yml`**
+```yaml
+view: entitypicker
+beanClass: com.dynamiasoluciones.modules.ventas.domain.Cliente
+autofields: false
+
+fields:
+  identification:
+  firstName:
+  lastName:
+
+params:
+  sizedByContent: true
+```
+
+> `searcheable: false` prevents the engine from applying search filters on that field.
+
+---
+
+## `entityfilters` Descriptor -- Search Filters
+
+Defines fields available as filters in listing view. Fields are also rendered as columns in filtered result table.
+
+```yaml
+view: entityfilters
+beanClass: com.dynamiasoluciones.modules.inventario.domain.ItemInventario
+autofields: false
+
+fields:
+  name:
+  mainLine:
+  totalStock:
+    label: Stock
+    params:
+      converter: converters.Decimal
+      header:
+        align: center
+        style: "background-color: maroon; color: white"
+      footer:
+        function: sum
+        functionConverter: converters.Decimal
+
+  photo:
+    params:
+      filterCustomizer: com.example.ItemPhotoFilterCustomizer   # Custom filter logic
+
+params:
+  orderBy: name
+```
+
+---
+
+## `export` Descriptor -- Export
+
+Defines fields included when exporting an entity to Excel or other formats:
+
+```yaml
+view: export
+beanClass: com.dynamiasoluciones.modules.ventas.domain.Cliente
+autofields: false
+
+fields:
+  identification:
+  firstName:
+  lastName:
+  city.name:
+    label: City
+  city.department.country.name:
+    label: Country
+  creationDate:
+  creator:
+```
+
+---
+
+## `config` Descriptor -- Module Configuration
+
+Lets you define a form for module configuration parameters. Values are stored as `AccountParameter`.
+
+```yaml
+id: VentasConfig
+view: config
+
+fields:
+  MaxQuickSaleValue:
+    label: Maximum Quick Sale Value
+    component: textbox
+    params:
+      cacheable: true                    # Value is cached for better performance
+
+  DefaultCustomerId:
+    label: Default Customer Identification
+    component: entitypicker
+    params:
+      entityClass: com.example.Cliente
+      entityProperty: identificacion
+      cacheable: true
+
+params:
+  parameterClass: tools.dynamia.modules.saas.jpa.AccountParameter
+
+layout:
+  columns: 4
+```
+
+---
+
+## `json` Descriptor -- JSON Representation
+
+Defines fields serialized when generating JSON representation of an entity (for webhooks, integrations, internal APIs):
+
+```yaml
+view: json
+beanClass: com.dynamiasoluciones.modules.inventario.domain.ItemInventario
+autofields: false
+
+fields:
+  name:
+  code:
+  reference:
+  salePrice:
+  estimatedCost:
+  active:
+```
+
+---
+
+## `tree` Descriptor -- Tree View
+
+For hierarchical entities (parent-child). Engine renders an expandable tree.
+
+```yaml
+view: tree
+beanClass: com.dynamiasoluciones.modules.inventario.domain.LineaInventario
+autofields: false
+
+fields:
+  name:
+    label: Lines
+    params:
+      header:
+        width: 350px
+  active:
+    label: Active
+  photo:
+    label: Photo
+    component: entityfileImage
+```
+
+---
+
+## Descriptor with Custom ID
+
+A file can define an `id` to be referenced explicitly from code or another descriptor, instead of using filename as identifier:
+
+```yaml
+id: customerBasicForm
+view: form
+autofields: false
+
+fields:
+  identification:
+    component: textbox
+    required: true
+  firstName:
+    component: textbox
+    required: true
+
+layout:
+  columns: 2
+```
+
+---
+
+## Inline Editable Table (`writable`)
+
+Embedded tables inside forms can allow direct cell editing:
+
+```yaml
+view: table
+beanClass: com.example.StickerItem
+autofields: false
+
+fields:
+  code:
+    params:
+      header:
+        width: 100px
+  quantity:
+    component: intbox
+    params:
+      width: 99%
+      header:
+        width: 80px
+
+params:
+  writable: true      # Enables inline cell editing
+```
+
+---
+
+## Table Without `beanClass` (No Associated Entity)
+
+When a table shows data from a ViewModel or dynamic data source, `beanClass` can be omitted:
+
+```yaml
+view: table
+id: itemMovementsTable
+autofields: false
+
+fields:
+  movement.type:
+    label: Type
+  movement.creationTimestamp:
+    label: Date
+    params:
+      converter: converters.DateTime
+  realQuantity:
+    label: Qty
+    params:
+      nullValue: none    # Alternative text when value is null
+```
+
+---
+
+## Field Properties Summary
+
+| Property                | Level    | Description                                                       |
+|-------------------------|----------|-------------------------------------------------------------------|
+| `label`                 | field    | Visible field label                                               |
+| `description`           | field    | Helper text / hint below field                                    |
+| `component`             | field    | UI component to use                                               |
+| `required`              | field    | Required field (`true`/`false`)                                  |
+| `visible`               | field    | Visibility (`true`/`false`)                                      |
+| `action`                | field    | Action to execute (for `component: link`)                        |
+| `class`                 | field    | Entity Java class (for `entitypicker` without `beanClass`)       |
+| `params.span`           | params   | Number of layout columns occupied                                 |
+| `params.span-sm`        | params   | Columns in small screens                                          |
+| `params.readonly`       | params   | Non-editable field                                                |
+| `params.multiline`      | params   | Show as textarea                                                  |
+| `params.height`         | params   | Textarea height                                                   |
+| `params.width`          | params   | Component width                                                   |
+| `params.placeholder`    | params   | Field placeholder text                                            |
+| `params.format`         | params   | Numeric formatting pattern                                        |
+| `params.constraint`     | params   | ZK validation rule                                                |
+| `params.newRow`         | params   | Force new layout row                                              |
+| `params.style`          | params   | Inline CSS applied to component                                   |
+| `params.sclass`         | params   | CSS classes applied to component                                  |
+| `params.converter`      | params   | Converter to transform displayed value                            |
+| `params.searcheable`    | params   | Include/exclude from search engine (default: `true`)             |
+| `params.nullValue`      | params   | Alternative text when value is `null`                            |
+| `params.popupWidth`     | params   | Selection popup width (for example, `200%`)                      |
+| `params.automodel`      | params   | Automatic combobox model loading                                  |
+| `params.imageOnly`      | params   | Only allows image upload (for `entityfile`)                      |
+| `params.shared`         | params   | Image shared between records (without duplicating files)          |
+| `params.imageMaxHeight` | params   | Maximum image height on upload                                    |
+| `params.imageMaxWidth`  | params   | Maximum image width on upload                                     |
+| `params.imageAutoJpg`   | params   | Automatically convert upload to JPG                               |
+| `params.thumbnail`      | params   | Show as thumbnail (for `entityfileImage`)                        |
+| `params.thumbnailWidth` | params   | Thumbnail width                                                   |
+| `params.thumbnailHeight`| params   | Thumbnail height                                                  |
+| `params.bind`           | params   | Name of linked `entityfile` field for preview                    |
+| `params.cacheable`      | params   | Configuration parameter cached in memory                          |
+| `params.entityClass`    | params   | Entity class to select in `entitypicker`                         |
+| `params.entityProperty` | params   | Entity property used as selected value                            |
+| `params.entityAlias`    | params   | Entity type alias for `entityrefpicker`                          |
+| `params.bindings`       | params   | Component fields to entity properties mapping                     |
+| `params.className`      | params   | Provider class for `providermultipickerbox`                      |
+| `params.idField`        | params   | Item ID field in `providermultipickerbox`                        |
+| `params.nameField`      | params   | Item name field in `providermultipickerbox`                      |
+| `params.iconsNamesValues` | params | `value|css-class` list for `enumiconimage`                       |
+| `params.filterCustomizer` | params | Customizer class for custom filter logic                          |
+| `header.align`          | header   | Column header alignment: `left`, `center`, `right`               |
+| `header.width`          | header   | Fixed column width                                                |
+| `header.sclass`         | header   | Header CSS classes                                                |
+| `header.style`          | header   | Header inline CSS                                                 |
+| `cell.sclass`           | cell     | Data cell CSS classes                                             |
+| `footer.function`       | footer   | Column aggregate function                                         |
+| `footer.functionConverter` | footer| Converter applied to aggregate result                             |

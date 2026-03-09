@@ -1,0 +1,45 @@
+---
+title: Como funcionan las Actions
+---
+
+Las **Actions** son un concepto central en DynamiaTools. Permiten encapsular comportamiento reutilizable en diferentes partes de la aplicacion: botones, menus, celdas de tabla, toolbars y mas.
+
+## Definir una Action
+
+Normalmente defines una clase que extiende `AbstractCrudAction` o implementa `Action`.
+
+```java
+package demo.actions;
+
+import tools.dynamia.actions.AbstractAction;
+import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.actions.InstallAction;
+
+@InstallAction
+public class PrintHelloAction extends AbstractCrudAction {
+
+    public PrintHelloAction() {
+        setId("PrintHelloAction");
+        setName("Say Hello");
+        setApplicableClass(Person.class); // Opcional: limita esta accion a entidades Person
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        System.out.println("Hello from Dynamia Action");
+    }
+}
+```
+
+## Registrar y usar la Action
+
+Con `@InstallAction`, Dynamia la detecta automaticamente en el contexto Spring.
+
+
+## Recomendaciones
+
+- Usa nombres de accion estables (`setName`) para referenciarlas desde YAML.
+- Mueve logica de negocio a servicios Spring e invocalos desde la action.
+- Evita actions demasiado grandes; divide por responsabilidad.
+- Agrega validaciones de contexto cuando la action dependa de una fila o entidad seleccionada.
+

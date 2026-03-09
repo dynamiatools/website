@@ -2,4 +2,46 @@
 title: Crud Service
 ---
 
-TODO
+`CrudService` is the main abstraction for CRUD operations in DynamiaTools.
+
+## What it does
+
+- Create, read, update, and delete entities.
+- Centralize data access for CRUD views and application processes.
+- Avoid repetitive repositories in standard scenarios.
+
+## Default implementation
+
+The common implementation is `JpaCrudService`, based on JPA.
+
+```java
+import org.springframework.stereotype.Service;
+import tools.dynamia.crud.CrudService;
+
+@Service
+public class CustomerAppService {
+
+    private final CrudService crudService;
+
+    public CustomerAppService(CrudService crudService) {
+        this.crudService = crudService;
+    }
+
+    public void activate(Long customerId) {
+        Customer customer = crudService.find(Customer.class, customerId);
+        customer.setActive(true);
+        crudService.save(customer);
+    }
+
+    public List<Customer> findActiveCustomers() {
+        return crudService.findAll(Customer.class, "active", true);
+    }
+}
+```
+
+## Best practices
+
+- Use `CrudService` from application services, not directly from complex controllers.
+- Encapsulate business rules in Spring services.
+- Keep entities clean and validated with Bean Validation.
+- For advanced queries, combine `CrudService` with specialized query components.

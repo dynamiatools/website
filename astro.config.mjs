@@ -54,7 +54,9 @@ export default defineConfig({
                     items: [
                         'getting-started',
                         'key-concepts',
-                        'custom-setup'
+                        'custom-setup',
+                        'view-descriptors',
+                        'frontend-sdk'
                     ]
                 },
                 {

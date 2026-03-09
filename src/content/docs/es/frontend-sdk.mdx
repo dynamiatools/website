@@ -1,0 +1,583 @@
+---
+title: SDK Frontend
+description: Construye aplicaciones web modernas con el SDK oficial de JavaScript/TypeScript para Dynamia Platform
+---
+
+El **@dynamia-tools/sdk** es la librería cliente oficial de JavaScript y TypeScript para Dynamia Platform. Proporciona una interfaz limpia y completamente tipada para interactuar con las APIs REST de tu backend, facilitando la construcción de aplicaciones web modernas con React, Vue, Angular, o cualquier otro framework de JavaScript.
+
+## ¿Por Qué Usar el SDK?
+
+En lugar de crear manualmente peticiones fetch y gestionar endpoints de API, el SDK te ofrece:
+
+- **🎯 Soporte Completo de TypeScript** – Autocompletado y seguridad de tipos para todas las llamadas a la API
+- **🚀 Cero Dependencias en Tiempo de Ejecución** – Ligero y rápido
+- **📦 Cobertura Completa de la API** – Acceso a metadatos, operaciones CRUD, acciones, reportes, archivos y más
+- **🔐 Autenticación Flexible** – Soporte para tokens Bearer, autenticación básica y cookies de sesión
+- **🛡️ Manejo de Errores Integrado** – Mensajes de error claros con tipos apropiados
+
+## Comenzando
+
+### Instalación
+
+Instala el paquete usando tu gestor de paquetes favorito:
+
+```bash
+# pnpm (recomendado)
+pnpm add @dynamia-tools/sdk
+
+# npm
+npm install @dynamia-tools/sdk
+
+# yarn
+yarn add @dynamia-tools/sdk
+```
+
+### Uso Básico
+
+Crea una instancia del cliente y comienza a hacer llamadas a la API:
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+
+// Inicializar el cliente
+const client = new DynamiaClient({
+  baseUrl: 'https://tu-app.ejemplo.com',
+  token: 'tu-token-jwt-aqui',
+});
+
+// Obtener metadatos de la aplicación
+const app = await client.metadata.getApp();
+console.log(`Conectado a ${app.name} v${app.version}`);
+
+// Trabajar con entidades
+const books = await client.crud('store/books').findAll();
+console.log(`Se encontraron ${books.total} libros`);
+```
+
+## Autenticación
+
+El SDK soporta múltiples métodos de autenticación para ajustarse a las necesidades de tu aplicación:
+
+### Token Bearer (Recomendado para SPAs)
+
+Perfecto para aplicaciones de página única usando tokens JWT:
+
+```typescript
+const client = new DynamiaClient({
+  baseUrl: 'https://api.ejemplo.com',
+  token: 'eyJhbGciOiJIUzI1NiJ9...',
+});
+```
+
+### Autenticación Básica
+
+Para comunicación servidor a servidor:
+
+```typescript
+const client = new DynamiaClient({
+  baseUrl: 'https://api.ejemplo.com',
+  username: 'admin',
+  password: 'secret',
+});
+```
+
+### Basado en Sesión (con Cookies)
+
+Para aplicaciones web tradicionales usando cookies de sesión:
+
+```typescript
+const client = new DynamiaClient({
+  baseUrl: 'https://api.ejemplo.com',
+  withCredentials: true, // Incluir cookies en las peticiones
+});
+```
+
+## Características Principales
+
+### 📋 Trabajando con Entidades (CRUD)
+
+La API CRUD facilita la gestión de tus entidades de dominio:
+
+```typescript
+// Obtener una referencia a una colección de entidades
+const books = client.crud('catalog/books');
+
+// Listar todos los libros con paginación
+const page = await books.findAll({ page: 1, size: 20 });
+
+// Buscar y filtrar
+const results = await books.findAll({
+  q: 'typescript',
+  author: 'Martin Fowler'
+});
+
+// Obtener un solo libro por ID
+const book = await books.findById(42);
+
+// Crear un nuevo libro
+const newBook = await books.create({
+  title: 'Clean Code',
+  author: 'Robert C. Martin',
+  isbn: '978-0132350884',
+});
+
+// Actualizar un libro existente
+const updated = await books.update(42, {
+  price: 49.99,
+});
+
+// Eliminar un libro
+await books.delete(42);
+```
+
+### 🎯 Ejecutando Acciones
+
+Dispara lógica de negocio y acciones del lado del servidor:
+
+```typescript
+// Ejecutar una acción global
+const result = await client.actions.executeGlobal('sendWelcomeEmail', {
+  params: { userId: 123 },
+});
+
+// Ejecutar una acción específica de una entidad
+const orderResult = await client.actions.executeEntity(
+  'com.example.domain.Order',
+  'approveOrder',
+  {
+    data: { orderId: 99 },
+    params: { notify: true }
+  }
+);
+
+console.log(orderResult.message); // "Orden aprobada exitosamente"
+```
+
+### 🗂️ Metadatos de la Aplicación
+
+Descubre la estructura de tu aplicación en tiempo de ejecución:
+
+```typescript
+// Obtener información de la aplicación
+const app = await client.metadata.getApp();
+
+// Obtener el árbol de navegación completo
+const nav = await client.metadata.getNavigation();
+
+// Construir un menú dinámico
+nav.modules.forEach(module => {
+  console.log(`📦 ${module.name}`);
+  module.groups.forEach(group => {
+    group.pages.forEach(page => {
+      console.log(`  → ${page.name} (${page.virtualPath})`);
+    });
+  });
+});
+
+// Obtener metadatos para una entidad específica
+const bookMeta = await client.metadata.getEntity('com.example.domain.Book');
+
+// Obtener descriptores de vista (formulario, tabla, etc.)
+const formDescriptor = await client.metadata.getEntityView(
+  'com.example.domain.Book',
+  'form'
+);
+```
+
+### 📊 Reportes
+
+Accede y genera reportes desde tu backend:
+
+```typescript
+// Listar todos los reportes disponibles
+const reports = await client.reports.list();
+
+// Obtener datos de un reporte con filtros
+const salesData = await client.reports.get('sales', 'monthly-summary', {
+  year: '2026',
+  month: '03',
+});
+
+// O usar POST para filtros complejos
+const data = await client.reports.post('sales', 'monthly-summary', {
+  filters: [
+    { name: 'year', value: '2026' },
+    { name: 'status', value: 'CLOSED' },
+  ],
+});
+```
+
+### 📁 Gestión de Archivos
+
+Descarga y gestiona archivos desde la extensión entity-files:
+
+```typescript
+// Descargar un archivo como Blob
+const blob = await client.files.download('factura.pdf', 'uuid-123');
+
+// O obtener una URL directa para imágenes
+const imageUrl = client.files.getUrl('foto-perfil.jpg', 'uuid-456');
+
+// Usar en tu HTML
+<img src={imageUrl} alt="Perfil" />
+```
+
+### 🏢 Multi-tenencia (SaaS)
+
+Gestiona cuentas de inquilinos en aplicaciones multi-tenant:
+
+```typescript
+// Obtener información de la cuenta
+const account = await client.saas.getAccount('account-uuid');
+
+console.log(`Cuenta: ${account.name}`);
+console.log(`Estado: ${account.status}`);
+console.log(`Subdominio: ${account.subdomain}`);
+```
+
+## Manejo de Errores
+
+El SDK lanza errores tipados que son fáciles de capturar y manejar:
+
+```typescript
+import { DynamiaApiError } from '@dynamia-tools/sdk';
+
+try {
+  const book = await client.crud('books').findById(9999);
+} catch (error) {
+  if (error instanceof DynamiaApiError) {
+    console.error(`Error de API [${error.status}]: ${error.message}`);
+
+    // Manejar códigos de estado específicos
+    if (error.status === 404) {
+      console.log('Libro no encontrado');
+    } else if (error.status === 401) {
+      console.log('No autorizado - por favor inicia sesión');
+    }
+  } else {
+    console.error('Error inesperado:', error);
+  }
+}
+```
+
+## Soporte de TypeScript
+
+El SDK está escrito en TypeScript y proporciona definiciones de tipos completas para todas las APIs:
+
+```typescript
+import type {
+  ApplicationMetadata,
+  NavigationTree,
+  EntityMetadata,
+  ViewDescriptor,
+  ActionExecutionResponse,
+  CrudListResult,
+} from '@dynamia-tools/sdk';
+
+// Operaciones CRUD genéricas con tipos personalizados
+interface Book {
+  id: number;
+  title: string;
+  author: string;
+  isbn: string;
+  price: number;
+}
+
+const books = client.crud<Book>('catalog/books');
+const result: CrudListResult<Book> = await books.findAll();
+
+result.content.forEach(book => {
+  // ✅ Autocompletado completo y verificación de tipos
+  console.log(`${book.title} por ${book.author} - $${book.price}`);
+});
+```
+
+## Ejemplo del Mundo Real
+
+Aquí hay un ejemplo completo de construcción de una función de gestión de libros:
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+
+// Inicializar cliente
+const client = new DynamiaClient({
+  baseUrl: import.meta.env.VITE_API_URL,
+  token: localStorage.getItem('auth_token'),
+});
+
+// Definir el tipo de tu entidad
+interface Book {
+  id?: number;
+  title: string;
+  author: string;
+  isbn: string;
+  price: number;
+  publishedDate: string;
+}
+
+// Crear una clase gestora de libros
+class BookManager {
+  private crud = client.crud<Book>('store/catalog/books');
+
+  async searchBooks(query: string) {
+    return await this.crud.findAll({ q: query, page: 1, size: 10 });
+  }
+
+  async getBook(id: number) {
+    return await this.crud.findById(id);
+  }
+
+  async createBook(book: Omit<Book, 'id'>) {
+    return await this.crud.create(book);
+  }
+
+  async updateBook(id: number, updates: Partial<Book>) {
+    return await this.crud.update(id, updates);
+  }
+
+  async deleteBook(id: number) {
+    await this.crud.delete(id);
+  }
+
+  async exportBooks() {
+    const result = await client.actions.executeGlobal('exportBooksToExcel', {
+      params: { format: 'xlsx' }
+    });
+    return result.data;
+  }
+}
+
+// Usar en tu aplicación
+const bookManager = new BookManager();
+
+// Buscar
+const results = await bookManager.searchBooks('clean code');
+console.log(`Se encontraron ${results.total} libros`);
+
+// Crear
+const newBook = await bookManager.createBook({
+  title: 'The Pragmatic Programmer',
+  author: 'Andrew Hunt',
+  isbn: '978-0135957059',
+  price: 44.95,
+  publishedDate: '2019-09-13',
+});
+
+// Actualizar
+await bookManager.updateBook(newBook.id!, { price: 39.99 });
+
+// Exportar
+await bookManager.exportBooks();
+```
+
+## Configuración Avanzada
+
+### Implementación Fetch Personalizada
+
+Puedes proporcionar tu propia implementación de fetch (útil para Node.js o pruebas):
+
+```typescript
+import fetch from 'node-fetch';
+
+const client = new DynamiaClient({
+  baseUrl: 'https://api.ejemplo.com',
+  token: 'token',
+  fetch: fetch as any,
+});
+```
+
+### Interceptores de Peticiones
+
+Aunque el SDK no incluye interceptores integrados, puedes envolver los métodos del cliente:
+
+```typescript
+class TrackedDynamiaClient extends DynamiaClient {
+  async request(endpoint: string, init?: RequestInit) {
+    console.log(`[API] ${init?.method || 'GET'} ${endpoint}`);
+    const start = Date.now();
+
+    try {
+      const response = await super.request(endpoint, init);
+      console.log(`[API] Completado en ${Date.now() - start}ms`);
+      return response;
+    } catch (error) {
+      console.error(`[API] Falló después de ${Date.now() - start}ms`, error);
+      throw error;
+    }
+  }
+}
+```
+
+## Mejores Prácticas
+
+### 1. Reutilizar Instancias del Cliente
+
+Crea una instancia del cliente y reutilízala en toda tu aplicación:
+
+```typescript
+// api-client.ts
+export const apiClient = new DynamiaClient({
+  baseUrl: import.meta.env.VITE_API_URL,
+  token: () => localStorage.getItem('auth_token'), // Evaluación diferida
+});
+```
+
+### 2. Manejar Renovación de Tokens
+
+Implementa lógica de renovación de tokens en tu capa de autenticación:
+
+```typescript
+async function refreshToken() {
+  const newToken = await fetch('/auth/refresh').then(r => r.json());
+  localStorage.setItem('auth_token', newToken.token);
+
+  // Crear nuevo cliente con el token actualizado
+  return new DynamiaClient({
+    baseUrl: API_URL,
+    token: newToken.token,
+  });
+}
+```
+
+### 3. Tipar Tus Entidades
+
+Siempre define interfaces de TypeScript para tus entidades de dominio:
+
+```typescript
+// types/entities.ts
+export interface Book {
+  id: number;
+  title: string;
+  author: string;
+  // ... otros campos
+}
+
+// Usar en toda tu aplicación
+const books = client.crud<Book>('books');
+```
+
+### 4. Centralizar el Manejo de Errores
+
+Crea un wrapper para un manejo consistente de errores:
+
+```typescript
+async function safeApiCall<T>(
+  operation: () => Promise<T>,
+  fallback?: T
+): Promise<T | undefined> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof DynamiaApiError) {
+      notifyUser(`Error: ${error.message}`);
+    }
+    return fallback;
+  }
+}
+
+// Uso
+const books = await safeApiCall(
+  () => client.crud('books').findAll(),
+  { content: [], total: 0, page: 1, pageSize: 20 }
+);
+```
+
+## Ejemplos de Integración con Frameworks
+
+### React
+
+```typescript
+import { useState, useEffect } from 'react';
+import { apiClient } from './api-client';
+
+function BookList() {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiClient.crud('books').findAll()
+      .then(result => setBooks(result.content))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div>Cargando...</div>;
+
+  return (
+    <ul>
+      {books.map(book => (
+        <li key={book.id}>{book.title}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Vue 3
+
+```vue
+<script setup lang="ts">
+import { ref, onMounted } from 'vue';
+import { apiClient } from './api-client';
+
+const books = ref([]);
+const loading = ref(true);
+
+onMounted(async () => {
+  const result = await apiClient.crud('books').findAll();
+  books.value = result.content;
+  loading.value = false;
+});
+</script>
+
+<template>
+  <div v-if="loading">Cargando...</div>
+  <ul v-else>
+    <li v-for="book in books" :key="book.id">
+      {{ book.title }}
+    </li>
+  </ul>
+</template>
+```
+
+### Svelte
+
+```svelte
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { apiClient } from './api-client';
+
+  let books = [];
+  let loading = true;
+
+  onMount(async () => {
+    const result = await apiClient.crud('books').findAll();
+    books = result.content;
+    loading = false;
+  });
+</script>
+
+{#if loading}
+  <div>Cargando...</div>
+{:else}
+  <ul>
+    {#each books as book (book.id)}
+      <li>{book.title}</li>
+    {/each}
+  </ul>
+{/if}
+```
+
+## Próximos Pasos
+
+- Consulta la [referencia completa de la API](https://github.com/dynamiatools/framework/tree/master/platform/packages/sdk) en el repositorio
+- Explora las [aplicaciones de demostración](https://github.com/dynamiatools/framework/tree/master/examples) para más ejemplos
+- Únete a nuestro [Discord de la comunidad](https://discord.gg/dynamia) para soporte y discusiones
+
+## Contribuir
+
+¡Damos la bienvenida a contribuciones! Por favor consulta nuestra [Guía de Contribución](https://github.com/dynamiatools/framework/blob/master/CONTRIBUTING.md) para más detalles.
+
+## Licencia
+
+Apache License 2.0 - ver [LICENSE](https://github.com/dynamiatools/framework/blob/master/LICENSE) para más detalles.
+

@@ -1,15 +1,44 @@
 ---
 title: How Actions Work
-
 ---
 
-Actions are a core concept in DynamiaTools, providing a way to encapsulate behavior and logic that can be reused across different parts of an application. They are designed to be flexible and can be associated with various UI components, such as buttons, menu items, or context menus.
+**Actions** are a core concept in DynamiaTools. They let you encapsulate reusable behavior in different parts of the application: buttons, menus, table cells, toolbars, and more.
 
-## Defining Actions
-To define an action, you typically create a class that extends `AbstractAction` or implements the `Action` interface. Here's a simple example of an action that prints a message to the console:
+## Defining an Action
+
+You typically define a class that extends `AbstractCrudAction` or implements `Action`.
 
 ```java
+package demo.actions;
+
 import tools.dynamia.actions.AbstractAction;
 import tools.dynamia.actions.ActionEvent;
-import tools.dynamia.actions.Action;
+import tools.dynamia.actions.InstallAction;
 
+@InstallAction
+public class PrintHelloAction extends AbstractCrudAction {
+
+    public PrintHelloAction() {
+        setId("PrintHelloAction");
+        setName("Say Hello");
+        setApplicableClass(Person.class); // Optional: limit this action to Person entities
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        System.out.println("Hello from Dynamia Action");
+    }
+}
+```
+
+## Registering and using the Action
+
+With `@InstallAction`, Dynamia automatically discovers it in the Spring context.
+
+
+## Recommendations
+
+- Use stable action names (`setName`) to reference them from YAML.
+- Move business logic to Spring services and invoke them from the action.
+- Avoid overly large actions; split by responsibility.
+- Add context validations when the action depends on a selected row or entity.

@@ -1,0 +1,362 @@
+---
+title: View Descriptors
+description: Los view descriptors son archivos YAML que definen como se presenta y se comporta una entidad en la interfaz de usuario.
+---
+
+Los **view descriptors** son archivos YAML que definen como se muestra y se comporta una entidad en la UI.
+Evitan escribir vistas ZUL manualmente para CRUD estandar, delegando la configuracion al motor de descriptores de Dynamia.
+
+## Ubicacion
+
+```
+<module>/ui/src/main/resources/META-INF/descriptors/
+```
+
+> En algunos casos tambien pueden ubicarse en `core/` cuando el descriptor no depende de componentes visuales (por ejemplo `*Json.yml`).
+
+## Estructura general
+
+Cada descriptor inicia con un encabezado que identifica tipo de vista y entidad:
+
+```yaml
+view: <type>                         # Tipo de vista (requerido)
+id: <identifier>                     # ID unico (opcional, por defecto nombre de archivo)
+beanClass: com.example.Entity        # Clase Java de la entidad (requerido en la mayoria de casos)
+controller: com.example.Controller   # CrudController personalizado (opcional)
+customizer: com.example.Customizer   # Personalizador de formulario (opcional)
+autofields: false                    # Si es true, genera campos automaticamente
+```
+
+## Tipos de vista (`view`)
+
+| Tipo            | Sufijo de archivo | Descripcion |
+|-----------------|-------------------|-------------|
+| `crud`          | `*Crud.yml`       | Vista completa (tabla + formulario) |
+| `form`          | `*Form.yml`       | Formulario de creacion/edicion |
+| `table`         | `*Table.yml`      | Tabla de listado |
+| `entitypicker`  | `*Picker.yml`     | Selector de entidad |
+| `entityfilters` | `*Filters.yml`    | Filtros de busqueda |
+| `export`        | `*Export.yml`     | Campos para exportar |
+| `config`        | `*Config.yml`     | Formulario de parametros del modulo |
+| `json`          | `*Json.yml`       | Representacion JSON |
+| `tree`          | `*Tree.yml`       | Vista en arbol |
+
+## Seccion `fields`
+
+Define los campos visibles en la vista. Cada campo usa el nombre del atributo Java de la entidad.
+
+```yaml
+fields:
+
+  name:                              # Campo simple con valores por defecto
+
+  price:
+    label: Precio de Venta
+    description: Solo valores >= 0
+    component: textbox
+    required: true
+    visible: false
+    params:
+      span: 2
+      span-sm: 12
+      readonly: true
+      multiline: true
+      height: 100px
+      placeholder: Escribe aqui...
+      format: '#,##0.##'
+      constraint: 'no negative: only positive values'
+      newRow: true
+      style: 'color: red'
+      sclass: orange lighten-5
+      width: 100px
+```
+
+### Propiedades anidadas
+
+Puedes usar notacion punto para navegar propiedades relacionadas:
+
+```yaml
+fields:
+  manufacturer.name:
+    label: Fabricante
+  contactData.email:
+    label: Email
+  city.department.country.name:
+    label: Pais
+```
+
+## Componentes de campo (`component`)
+
+| Componente | Descripcion |
+|------------|-------------|
+| `textbox` | Caja de texto simple |
+| `intbox` | Caja numerica para enteros |
+| `spinner` | Selector numerico con rango |
+| `combobox` | Lista desplegable |
+| `entitypicker` | Selector de entidad con busqueda |
+| `entityrefpicker` | Selector por campo de referencia |
+| `entityreflabel` | Muestra etiqueta de entidad referenciada por ID |
+| `crudview` | Tabla CRUD embebida para colecciones |
+| `coollabel` | Etiqueta compuesta (imagen, titulo, subtitulo, descripcion) |
+| `entityfileImage` | Vista previa de imagen en `entityfile` |
+| `link` | Celda en forma de enlace que ejecuta accion |
+| `enumiconimage` | Icono/clase CSS segun valor enum |
+| `printerCombobox` | Selector de impresora |
+| `cuentacontablepicker` | Selector de cuenta contable |
+| `providermultipickerbox` | Multi-selector alimentado por `Provider` de Spring |
+
+### Ejemplos
+
+**`coollabel`**:
+```yaml
+products:
+  component: coollabel
+  params:
+    header:
+      width: 450px
+    bindings:
+      imageURL: photoURL
+      title: name
+      subtitle: lineName
+      description: type.name
+      tooltiptext: description
+```
+
+**`entityfileImage`**:
+```yaml
+photoPreview1:
+  label: Vista previa
+  component: entityfileImage
+  params:
+    bind: photo1
+    thumbnail: true
+    thumbnailWidth: 100
+    thumbnailHeight: 100
+```
+
+**`crudview`**:
+```yaml
+subitems:
+  component: crudview
+
+features:
+  component: crudview
+  params:
+    controller: com.example.FeatureItemController
+```
+
+**`link`**:
+```yaml
+serialDesc:
+  label: Serial
+  component: link
+  action: ViewSerialsDM
+```
+
+## Estilos de columnas (`header`, `cell`, `footer`)
+
+```yaml
+totalStock:
+  label: Stock
+  params:
+    converter: converters.Decimal
+    header:
+      align: center
+      width: 120px
+      sclass: green color-white
+    cell:
+      sclass: green lighten-5
+    footer:
+      function: sum
+      functionConverter: converters.Decimal
+```
+
+## Conversores comunes
+
+| Conversor | Descripcion |
+|-----------|-------------|
+| `converters.Currency` | Moneda con simbolo y separadores |
+| `converters.CurrencySimple` | Moneda sin simbolo |
+| `converters.Decimal` | Numero decimal |
+| `converters.Date` | Fecha |
+| `converters.DateTime` | Fecha y hora |
+
+## Seccion `layout`
+
+```yaml
+layout:
+  columns: 4
+```
+
+## Seccion `groups`
+
+Agrupa campos en secciones colapsables o etiquetadas:
+
+```yaml
+groups:
+  salesConfiguration:
+    label: Configuracion de Ventas
+    collapse: true
+    fields:
+      - minSalePrice
+      - salePrice2
+      - sellable
+      - allowsDiscounts
+```
+
+## Seccion `actions`
+
+Permite habilitar/deshabilitar acciones CRUD estandar y configurar atributos:
+
+```yaml
+actions:
+  FindAction:
+    attributes:
+      searchFields: [ code, name, reference ]
+
+  NewAction:
+    enabled: false
+
+  ExportAction:
+    enabled: false
+```
+
+## Seccion `params`
+
+Parametros globales de la vista:
+
+```yaml
+params:
+  orderBy: name
+  pageSize: 50
+  span: true
+  sizedByContent: true
+  writable: true
+  visibleActions: 15
+```
+
+## Ejemplos por tipo de descriptor
+
+### `crud`
+```yaml
+view: crud
+beanClass: com.example.Item
+controller: com.example.ItemCrudController
+autofields: false
+```
+
+### `form`
+```yaml
+view: form
+beanClass: com.example.Item
+autofields: false
+layout:
+  columns: 4
+fields:
+  name:
+  price:
+    params:
+      format: '#,##0.##'
+```
+
+### `table`
+```yaml
+view: table
+beanClass: com.example.Item
+autofields: false
+fields:
+  name:
+  salePrice:
+    params:
+      converter: converters.Currency
+```
+
+### `entitypicker`
+```yaml
+view: entitypicker
+beanClass: com.example.Customer
+autofields: false
+fields:
+  identification:
+  firstName:
+  lastName:
+```
+
+### `entityfilters`
+```yaml
+view: entityfilters
+beanClass: com.example.Item
+autofields: false
+fields:
+  name:
+  totalStock:
+    params:
+      converter: converters.Decimal
+```
+
+### `export`
+```yaml
+view: export
+beanClass: com.example.Customer
+autofields: false
+fields:
+  identification:
+  firstName:
+  lastName:
+```
+
+### `config`
+```yaml
+id: VentasConfig
+view: config
+fields:
+  MaxQuickSaleValue:
+    component: textbox
+params:
+  parameterClass: tools.dynamia.modules.saas.jpa.AccountParameter
+```
+
+### `json`
+```yaml
+view: json
+beanClass: com.example.Item
+autofields: false
+fields:
+  name:
+  code:
+  salePrice:
+```
+
+### `tree`
+```yaml
+view: tree
+beanClass: com.example.InventoryLine
+autofields: false
+fields:
+  name:
+    label: Lineas
+  active:
+    label: Activo
+```
+
+## Tabla editable en linea (`writable`)
+
+Para tablas embebidas en formularios puedes habilitar edicion directa:
+
+```yaml
+view: table
+beanClass: com.example.StickerItem
+autofields: false
+fields:
+  code:
+  quantity:
+    component: intbox
+params:
+  writable: true
+```
+
+## Nota final
+
+Esta pagina resume los casos mas usados.
+Si necesitas referencia completa por propiedad y ejemplos extendidos, usa esta guia junto con los ejemplos en `docs/view-descriptors.mdx` y los descriptores reales de tus modulos.
+
