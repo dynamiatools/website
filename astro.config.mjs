@@ -1,7 +1,7 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-export const dynamiaToolsVersion = '26.2.1'
+export const dynamiaToolsVersion = '26.3.0'
 
 
 // https://astro.build/config
