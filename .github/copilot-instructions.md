@@ -76,6 +76,22 @@ When writing code examples for Dynamia Platform:
 - Add comments to explain key concepts
 - When mentioning versions, use CalVer format (e.g., 26.2.0)
 
+### TypeScript SDK + Vue Examples
+
+For frontend examples, use the current APIs from the framework packages:
+
+- @dynamia-tools/sdk for TypeScript client examples
+- @dynamia-tools/vue for Vue component examples
+
+Rules:
+
+- Use `DynamiaClient` from `@dynamia-tools/sdk`.
+- Prefer `baseUrl` as app origin (`https://app.example.com`) because SDK calls already include `/api/...` paths.
+- Navigation examples must use `NavigationTree.navigation` and `NavigationNode` (`children`, `internalPath`).
+- CRUD examples must use `CrudListResult` fields: `content`, `total`, `page`, `pageSize`, `totalPages`.
+- Vue examples should show `app.use(DynamiaVue)` and real components/composables (`DynamiaViewer`, `DynamiaCrudPage`, `useNavigation`, `useCrudPage`).
+- For navigation node type `CrudPage`, show rendering with `<DynamiaCrudPage :node="node" :client="client" />`.
+
 Example format:
 ```java
 //Contact.java
