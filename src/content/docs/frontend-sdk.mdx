@@ -1,583 +1,128 @@
 ---
 title: Frontend SDK
-description: Build modern web applications with the official JavaScript/TypeScript SDK for Dynamia Platform
+description: The new frontend approach for Dynamia Platform with core SDK, Vue support (beta), and extension SDKs
 ---
 
-The **@dynamia-tools/sdk** is the official JavaScript and TypeScript client library for Dynamia Platform. It provides a clean, fully-typed interface to interact with your backend's REST APIs, making it easy to build modern web applications with React, Vue, Angular, or any other JavaScript framework.
+The frontend stack in Dynamia Platform now follows a **modular approach**:
 
-## Why Use the SDK?
+1. **Core SDK**: `@dynamia-tools/sdk`
+2. **UI adapter (beta)**: `@dynamia-tools/vue`
+3. **Extension SDKs** when your backend enables extra modules (`reports`, `entity-files`, `saas`)
 
-Instead of manually crafting fetch requests and managing API endpoints, the SDK gives you:
+This page explains the new approach and how to combine these packages.
 
-- **🎯 Full TypeScript Support** – Autocomplete and type safety for all API calls
-- **🚀 Zero Runtime Dependencies** – Lightweight and fast
-- **📦 Complete API Coverage** – Access metadata, CRUD operations, actions, reports, files, and more
-- **🔐 Flexible Authentication** – Support for Bearer tokens, Basic Auth, and session cookies
-- **🛡️ Built-in Error Handling** – Clear error messages with proper types
+## Frontend Stack (v26)
 
-## Getting Started
+### 1) Core SDK (`@dynamia-tools/sdk`)
 
-### Installation
-
-Install the package using your favorite package manager:
+The core SDK is always the base layer. It gives you typed access to metadata, navigation, CRUD, and actions.
 
 ```bash
-# pnpm (recommended)
 pnpm add @dynamia-tools/sdk
-
-# npm
-npm install @dynamia-tools/sdk
-
-# yarn
-yarn add @dynamia-tools/sdk
 ```
-
-### Basic Usage
-
-Create a client instance and start making API calls:
 
 ```typescript
 import { DynamiaClient } from '@dynamia-tools/sdk';
 
-// Initialize the client
+export const client = new DynamiaClient({
+  baseUrl: import.meta.env.VITE_API_URL,
+  token: localStorage.getItem('auth_token') ?? undefined,
+});
+```
+
+### 2) Vue support (`@dynamia-tools/vue`) - Beta
+
+If you are building a Vue 3 app, use the official Vue adapter.
+
+```bash
+pnpm add vue @dynamia-tools/vue @dynamia-tools/ui-core @dynamia-tools/sdk
+```
+
+See the dedicated guide: [Vue Support (Beta)](/vue-support).
+
+### 3) Extension SDKs (optional)
+
+Install these only when your backend uses the corresponding extension:
+
+- `@dynamia-tools/reports-sdk`
+- `@dynamia-tools/files-sdk`
+- `@dynamia-tools/saas-sdk`
+
+See [Extensions](/extensions/) for installation and usage details.
+
+## Recommended Architecture
+
+Use one shared `DynamiaClient` and pass `client.http` to extension SDKs.
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+import { ReportsApi } from '@dynamia-tools/reports-sdk';
+import { FilesApi } from '@dynamia-tools/files-sdk';
+import { SaasApi } from '@dynamia-tools/saas-sdk';
+
 const client = new DynamiaClient({
-  baseUrl: 'https://your-app.example.com',
-  token: 'your-jwt-token-here',
+  baseUrl: import.meta.env.VITE_API_URL,
+  token: localStorage.getItem('auth_token') ?? undefined,
 });
 
-// Fetch application metadata
-const app = await client.metadata.getApp();
-console.log(`Connected to ${app.name} v${app.version}`);
+export const reports = new ReportsApi(client.http);
+export const files = new FilesApi(client.http);
+export const saas = new SaasApi(client.http);
+```
 
-// Work with entities
-const books = await client.crud('store/books').findAll();
-console.log(`Found ${books.total} books`);
+## Core Capabilities in the New Flow
+
+### Metadata and Navigation
+
+```typescript
+const app = await client.metadata.getApp();
+const navigation = await client.metadata.getNavigation();
+console.log(app.name, navigation.navigation.length);
+```
+
+### CRUD by virtual path
+
+```typescript
+const booksApi = client.crud('library/books');
+const page = await booksApi.findAll({ page: 1, size: 20, q: 'clean code' });
+```
+
+### Global and entity actions
+
+```typescript
+await client.actions.executeGlobal('exportBooksToExcel', {
+  params: { format: 'xlsx' },
+});
 ```
 
 ## Authentication
 
-The SDK supports multiple authentication methods to fit your application's needs:
+The same auth model is reused across all frontend SDK packages through the same `HttpClient`:
 
-### Bearer Token (Recommended for SPAs)
-
-Perfect for single-page applications using JWT tokens:
-
-```typescript
-const client = new DynamiaClient({
-  baseUrl: 'https://api.example.com',
-  token: 'eyJhbGciOiJIUzI1NiJ9...',
-});
-```
-
-### Basic Authentication
-
-For server-to-server communication:
-
-```typescript
-const client = new DynamiaClient({
-  baseUrl: 'https://api.example.com',
-  username: 'admin',
-  password: 'secret',
-});
-```
-
-### Session-Based (with Cookies)
-
-For traditional web applications using session cookies:
-
-```typescript
-const client = new DynamiaClient({
-  baseUrl: 'https://api.example.com',
-  withCredentials: true, // Include cookies in requests
-});
-```
-
-## Core Features
-
-### 📋 Working with Entities (CRUD)
-
-The CRUD API makes it simple to manage your domain entities:
-
-```typescript
-// Get a reference to an entity collection
-const books = client.crud('catalog/books');
-
-// List all books with pagination
-const page = await books.findAll({ page: 1, size: 20 });
-
-// Search and filter
-const results = await books.findAll({
-  q: 'typescript',
-  author: 'Martin Fowler'
-});
-
-// Get a single book by ID
-const book = await books.findById(42);
-
-// Create a new book
-const newBook = await books.create({
-  title: 'Clean Code',
-  author: 'Robert C. Martin',
-  isbn: '978-0132350884',
-});
-
-// Update an existing book
-const updated = await books.update(42, {
-  price: 49.99,
-});
-
-// Delete a book
-await books.delete(42);
-```
-
-### 🎯 Executing Actions
-
-Trigger business logic and server-side actions:
-
-```typescript
-// Execute a global action
-const result = await client.actions.executeGlobal('sendWelcomeEmail', {
-  params: { userId: 123 },
-});
-
-// Execute an entity-specific action
-const orderResult = await client.actions.executeEntity(
-  'com.example.domain.Order',
-  'approveOrder',
-  {
-    data: { orderId: 99 },
-    params: { notify: true }
-  }
-);
-
-console.log(orderResult.message); // "Order approved successfully"
-```
-
-### 🗂️ Application Metadata
-
-Discover your application's structure at runtime:
-
-```typescript
-// Get application info
-const app = await client.metadata.getApp();
-
-// Get the full navigation tree
-const nav = await client.metadata.getNavigation();
-
-// Build a dynamic menu
-nav.modules.forEach(module => {
-  console.log(`📦 ${module.name}`);
-  module.groups.forEach(group => {
-    group.pages.forEach(page => {
-      console.log(`  → ${page.name} (${page.virtualPath})`);
-    });
-  });
-});
-
-// Get metadata for a specific entity
-const bookMeta = await client.metadata.getEntity('com.example.domain.Book');
-
-// Get view descriptors (form, table, etc.)
-const formDescriptor = await client.metadata.getEntityView(
-  'com.example.domain.Book',
-  'form'
-);
-```
-
-### 📊 Reports
-
-Access and generate reports from your backend:
-
-```typescript
-// List all available reports
-const reports = await client.reports.list();
-
-// Fetch report data with filters
-const salesData = await client.reports.get('sales', 'monthly-summary', {
-  year: '2026',
-  month: '03',
-});
-
-// Or use POST for complex filters
-const data = await client.reports.post('sales', 'monthly-summary', {
-  filters: [
-    { name: 'year', value: '2026' },
-    { name: 'status', value: 'CLOSED' },
-  ],
-});
-```
-
-### 📁 File Management
-
-Download and manage files from the entity-files extension:
-
-```typescript
-// Download a file as a Blob
-const blob = await client.files.download('invoice.pdf', 'uuid-123');
-
-// Or get a direct URL for images
-const imageUrl = client.files.getUrl('profile-pic.jpg', 'uuid-456');
-
-// Use in your HTML
-<img src={imageUrl} alt="Profile" />
-```
-
-### 🏢 Multi-Tenancy (SaaS)
-
-Manage tenant accounts in multi-tenant applications:
-
-```typescript
-// Get account information
-const account = await client.saas.getAccount('account-uuid');
-
-console.log(`Account: ${account.name}`);
-console.log(`Status: ${account.status}`);
-console.log(`Subdomain: ${account.subdomain}`);
-```
+- `token` for Bearer auth (recommended for SPA)
+- `username` + `password` for Basic auth
+- `withCredentials: true` for cookie/session-based auth
 
 ## Error Handling
-
-The SDK throws typed errors that are easy to catch and handle:
 
 ```typescript
 import { DynamiaApiError } from '@dynamia-tools/sdk';
 
 try {
-  const book = await client.crud('books').findById(9999);
+  await client.crud('library/books').findById(999999);
 } catch (error) {
   if (error instanceof DynamiaApiError) {
-    console.error(`API Error [${error.status}]: ${error.message}`);
-
-    // Handle specific status codes
-    if (error.status === 404) {
-      console.log('Book not found');
-    } else if (error.status === 401) {
-      console.log('Unauthorized - please login');
-    }
-  } else {
-    console.error('Unexpected error:', error);
+    console.error(`[${error.status}] ${error.message}`);
   }
 }
-```
-
-## TypeScript Support
-
-The SDK is written in TypeScript and provides full type definitions for all APIs:
-
-```typescript
-import type {
-  ApplicationMetadata,
-  NavigationTree,
-  EntityMetadata,
-  ViewDescriptor,
-  ActionExecutionResponse,
-  CrudListResult,
-} from '@dynamia-tools/sdk';
-
-// Generic CRUD operations with custom types
-interface Book {
-  id: number;
-  title: string;
-  author: string;
-  isbn: string;
-  price: number;
-}
-
-const books = client.crud<Book>('catalog/books');
-const result: CrudListResult<Book> = await books.findAll();
-
-result.content.forEach(book => {
-  // ✅ Full autocomplete and type checking
-  console.log(`${book.title} by ${book.author} - $${book.price}`);
-});
-```
-
-## Real-World Example
-
-Here's a complete example of building a book management feature:
-
-```typescript
-import { DynamiaClient } from '@dynamia-tools/sdk';
-
-// Initialize client
-const client = new DynamiaClient({
-  baseUrl: import.meta.env.VITE_API_URL,
-  token: localStorage.getItem('auth_token'),
-});
-
-// Define your entity type
-interface Book {
-  id?: number;
-  title: string;
-  author: string;
-  isbn: string;
-  price: number;
-  publishedDate: string;
-}
-
-// Create a book manager class
-class BookManager {
-  private crud = client.crud<Book>('store/catalog/books');
-
-  async searchBooks(query: string) {
-    return await this.crud.findAll({ q: query, page: 1, size: 10 });
-  }
-
-  async getBook(id: number) {
-    return await this.crud.findById(id);
-  }
-
-  async createBook(book: Omit<Book, 'id'>) {
-    return await this.crud.create(book);
-  }
-
-  async updateBook(id: number, updates: Partial<Book>) {
-    return await this.crud.update(id, updates);
-  }
-
-  async deleteBook(id: number) {
-    await this.crud.delete(id);
-  }
-
-  async exportBooks() {
-    const result = await client.actions.executeGlobal('exportBooksToExcel', {
-      params: { format: 'xlsx' }
-    });
-    return result.data;
-  }
-}
-
-// Use it in your app
-const bookManager = new BookManager();
-
-// Search
-const results = await bookManager.searchBooks('clean code');
-console.log(`Found ${results.total} books`);
-
-// Create
-const newBook = await bookManager.createBook({
-  title: 'The Pragmatic Programmer',
-  author: 'Andrew Hunt',
-  isbn: '978-0135957059',
-  price: 44.95,
-  publishedDate: '2019-09-13',
-});
-
-// Update
-await bookManager.updateBook(newBook.id!, { price: 39.99 });
-
-// Export
-await bookManager.exportBooks();
-```
-
-## Advanced Configuration
-
-### Custom Fetch Implementation
-
-You can provide your own fetch implementation (useful for Node.js or testing):
-
-```typescript
-import fetch from 'node-fetch';
-
-const client = new DynamiaClient({
-  baseUrl: 'https://api.example.com',
-  token: 'token',
-  fetch: fetch as any,
-});
-```
-
-### Request Interceptors
-
-While the SDK doesn't include built-in interceptors, you can wrap the client methods:
-
-```typescript
-class TrackedDynamiaClient extends DynamiaClient {
-  async request(endpoint: string, init?: RequestInit) {
-    console.log(`[API] ${init?.method || 'GET'} ${endpoint}`);
-    const start = Date.now();
-
-    try {
-      const response = await super.request(endpoint, init);
-      console.log(`[API] Completed in ${Date.now() - start}ms`);
-      return response;
-    } catch (error) {
-      console.error(`[API] Failed after ${Date.now() - start}ms`, error);
-      throw error;
-    }
-  }
-}
-```
-
-## Best Practices
-
-### 1. Reuse Client Instances
-
-Create one client instance and reuse it throughout your application:
-
-```typescript
-// api-client.ts
-export const apiClient = new DynamiaClient({
-  baseUrl: import.meta.env.VITE_API_URL,
-  token: () => localStorage.getItem('auth_token'), // Lazy evaluation
-});
-```
-
-### 2. Handle Token Refresh
-
-Implement token refresh logic in your authentication layer:
-
-```typescript
-async function refreshToken() {
-  const newToken = await fetch('/auth/refresh').then(r => r.json());
-  localStorage.setItem('auth_token', newToken.token);
-
-  // Create new client with updated token
-  return new DynamiaClient({
-    baseUrl: API_URL,
-    token: newToken.token,
-  });
-}
-```
-
-### 3. Type Your Entities
-
-Always define TypeScript interfaces for your domain entities:
-
-```typescript
-// types/entities.ts
-export interface Book {
-  id: number;
-  title: string;
-  author: string;
-  // ... other fields
-}
-
-// Use throughout your app
-const books = client.crud<Book>('books');
-```
-
-### 4. Centralize Error Handling
-
-Create a wrapper for consistent error handling:
-
-```typescript
-async function safeApiCall<T>(
-  operation: () => Promise<T>,
-  fallback?: T
-): Promise<T | undefined> {
-  try {
-    return await operation();
-  } catch (error) {
-    if (error instanceof DynamiaApiError) {
-      notifyUser(`Error: ${error.message}`);
-    }
-    return fallback;
-  }
-}
-
-// Usage
-const books = await safeApiCall(
-  () => client.crud('books').findAll(),
-  { content: [], total: 0, page: 1, pageSize: 20 }
-);
-```
-
-## Framework Integration Examples
-
-### React
-
-```typescript
-import { useState, useEffect } from 'react';
-import { apiClient } from './api-client';
-
-function BookList() {
-  const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    apiClient.crud('books').findAll()
-      .then(result => setBooks(result.content))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <div>Loading...</div>;
-
-  return (
-    <ul>
-      {books.map(book => (
-        <li key={book.id}>{book.title}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-### Vue 3
-
-```vue
-<script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { apiClient } from './api-client';
-
-const books = ref([]);
-const loading = ref(true);
-
-onMounted(async () => {
-  const result = await apiClient.crud('books').findAll();
-  books.value = result.content;
-  loading.value = false;
-});
-</script>
-
-<template>
-  <div v-if="loading">Loading...</div>
-  <ul v-else>
-    <li v-for="book in books" :key="book.id">
-      {{ book.title }}
-    </li>
-  </ul>
-</template>
-```
-
-### Svelte
-
-```svelte
-<script lang="ts">
-  import { onMount } from 'svelte';
-  import { apiClient } from './api-client';
-
-  let books = [];
-  let loading = true;
-
-  onMount(async () => {
-    const result = await apiClient.crud('books').findAll();
-    books = result.content;
-    loading = false;
-  });
-</script>
-
-{#if loading}
-  <div>Loading...</div>
-{:else}
-  <ul>
-    {#each books as book (book.id)}
-      <li>{book.title}</li>
-    {/each}
-  </ul>
-{/if}
 ```
 
 ## Next Steps
 
-- Check out the [complete API reference](https://github.com/dynamiatools/framework/tree/master/platform/packages/sdk) in the repository
-- Explore the [demo applications](https://github.com/dynamiatools/framework/tree/master/examples) for more examples
-- Join our [community Discord](https://discord.gg/dynamia) for support and discussions
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](https://github.com/dynamiatools/framework/blob/master/CONTRIBUTING.md) for details.
-
-## License
-
-Apache License 2.0 - see [LICENSE](https://github.com/dynamiatools/framework/blob/master/LICENSE) for details.
+- Read [Vue Support (Beta)](/vue-support)
+- Explore [Extensions](/extensions/)
+- Review the package docs in the monorepo:
+  - `platform/packages/sdk`
+  - `platform/packages/vue`
+  - `extensions/*/packages/*-sdk`
 

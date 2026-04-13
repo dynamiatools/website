@@ -1,0 +1,65 @@
+---
+title: File Importer
+description: Import and process spreadsheet files with async execution and progress monitoring
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+File Importer helps users upload and process spreadsheet files (Excel), with asynchronous execution, progress monitoring, and cancel support.
+
+You can define custom import logic by implementing your own import action.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.importer</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.importer.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.importer:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.importer.ui:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+No dedicated Node package is currently published for this extension.
+
+Use your backend endpoints/actions from the frontend through `@dynamia-tools/sdk`.
+
+## Java usage example
+
+```java
+import java.util.Date;
+import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.modules.importer.ui.Importer;
+
+public class ImportPeopleCrudAction extends AbstractCrudAction {
+
+    public ImportPeopleCrudAction() {
+        setName("Import");
+        setApplicableClass(Person.class);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+        var importer = new Importer();
+        importer.addColumn("Code");
+        importer.addColumn("Name");
+        importer.addColumn("Start Date", "dateOfStart");
+        importer.addAction(new ImportPeopleExcelAction());
+        importer.show("Import People");
+    }
+}
+```
+

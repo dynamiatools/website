@@ -27,7 +27,7 @@ export const version = dynamiaToolsVersion;
 
         Powered by **Spring Boot 4** (https://spring.io), **ZK 10** (https://www.zkoss.org) for automatic web UI generation, and **JPA** for data persistence.
 
-        Now with **CalVer versioning** (YY.MM.MINOR) and all modules unified in one version: **{version}** (February 2026).
+        Now with **CalVer versioning** (YY.MM.MINOR) and all modules unified in one version: **{version}**.
     </Card>
     <Card title="What can it do?" icon="add-document">
         * **Build full-stack web applications** with automatic UI generation
@@ -69,16 +69,18 @@ export const version = dynamiaToolsVersion;
         All powered by a **production-proven** platform used by companies across Latin America and Europe.
     </Card>
     <Card title="Frontend SDK - Build Modern UIs" icon="laptop">
-        The **@dynamia-tools/sdk** is the official JavaScript/TypeScript client library for building modern web frontends with React, Vue, Angular, or any framework.
+        The new frontend stack is now modular:
 
-        **Key Features:**
-        * **Full TypeScript support** with autocomplete and type safety
-        * **Zero runtime dependencies** - Lightweight and fast
-        * **Flexible authentication** - Bearer tokens, Basic Auth, and sessions
-        * **Complete API coverage** - CRUD, actions, metadata, reports, files, and more
+        * **@dynamia-tools/sdk** as the core typed API client
+        * **@dynamia-tools/vue** for metadata-driven Vue UIs (**beta**)
+        * Extension SDKs for reports, files, and SaaS when needed
 
         <LinkButton href="/frontend-sdk" variant="secondary">
             Learn more about the SDK →
+        </LinkButton>
+
+        <LinkButton href="/vue-support" variant="minimal">
+            Vue Support (Beta)
         </LinkButton>
     </Card>
     <Card title="Quick Start" icon="rocket">
@@ -96,6 +98,6 @@ export const version = dynamiaToolsVersion;
 
         Discover the **built-in enterprise extensions**, customize your application, extend the framework, and build innovative solutions with **Dynamia Platform**.
 
-        Check out the [Frontend SDK](/frontend-sdk) to build modern web UIs with React, Vue, or Angular!
+        Check out [Frontend SDK](/frontend-sdk), [Vue Support (Beta)](/vue-support), and [Extensions](/extensions/) to build modern web frontends.
     </Card>
 </CardGrid>

@@ -1,0 +1,61 @@
+---
+title: Security
+description: Users, profiles, tokens, and access control on top of Spring Security
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+Security adds user/profile management and access control features to Dynamia applications.
+
+It is built on top of Spring Security and includes:
+
+- users and profile management,
+- token support,
+- role/permission-based restrictions,
+- optional UI module for admin features.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.security</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.security.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.security:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.security.ui:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+No dedicated Node package is currently published for this extension.
+
+Frontend apps consume security-enabled endpoints and authentication flows through `@dynamia-tools/sdk`.
+
+## Java usage example
+
+```java
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+
+@RestController
+public class AdminController {
+
+    @GetMapping("/api/admin/health")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String health() {
+        return "ok";
+    }
+}
+```
+

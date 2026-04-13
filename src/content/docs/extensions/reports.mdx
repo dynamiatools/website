@@ -1,0 +1,78 @@
+---
+title: Reports
+description: Define and run reports, filters, exports, and report APIs
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+Reports provides an in-app reporting module where users can run query-based reports, apply filters, and export results (CSV, Excel, PDF).
+
+It includes API, core, and UI modules.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.reports.api</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.reports.core</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.reports.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.api:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.core:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.ui:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+```bash
+pnpm add @dynamia-tools/reports-sdk @dynamia-tools/sdk
+```
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+import { ReportsApi } from '@dynamia-tools/reports-sdk';
+
+const client = new DynamiaClient({ baseUrl: import.meta.env.VITE_API_URL, token: '...' });
+const reports = new ReportsApi(client.http);
+
+const list = await reports.list();
+const data = await reports.post('sales', 'monthly', {
+  options: [{ name: 'year', value: '2026' }],
+});
+```
+
+## Java usage example
+
+```java
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
+HttpClient http = HttpClient.newHttpClient();
+
+HttpRequest request = HttpRequest.newBuilder()
+        .uri(URI.create("https://your-app.example.com/api/reports/sales/monthly?year=2026"))
+        .header("Authorization", "Bearer " + token)
+        .GET()
+        .build();
+
+HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+System.out.println(response.body());
+```
+

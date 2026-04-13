@@ -1,0 +1,67 @@
+---
+title: Finances
+description: Financial document calculation framework for taxes, discounts, fees, and totals
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+Finances provides a calculation engine for financial documents.
+
+It focuses on:
+
+- deterministic totals,
+- charge ordering by priority,
+- support for taxes, discounts, withholdings, and fees,
+- currency-aware calculations.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.finances.api</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.finances.api:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+No dedicated Node package is currently published for this extension.
+
+This module is mainly a backend/domain calculation framework.
+
+## Java usage example
+
+```java
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+FinancialDocument invoice = new FinancialDocument();
+invoice.setType(DocumentType.SALE);
+invoice.setStatus(DocumentStatus.DRAFT);
+invoice.setIssueDate(LocalDate.now());
+invoice.setCurrency("USD");
+
+DocumentLine line = new DocumentLine();
+line.setDescription("Product A");
+line.setQuantity(new BigDecimal("10"));
+line.setUnitPrice(Money.of("100", "USD"));
+
+Charge vat = new Charge();
+vat.setCode("VAT19");
+vat.setType(ChargeType.TAX);
+vat.setRateType(RateType.PERCENTAGE);
+vat.setValue(new BigDecimal("19"));
+vat.setPriority(20);
+
+line.addCharge(vat);
+invoice.addLine(line);
+
+FinancialCalculator calculator = new DefaultFinancialCalculator();
+calculator.calculateDocument(invoice);
+```
+

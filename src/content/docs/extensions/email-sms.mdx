@@ -1,0 +1,71 @@
+---
+title: Email & SMS
+description: Async email and SMS services for Dynamia Platform
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+Email & SMS provides asynchronous messaging capabilities in Dynamia applications.
+
+It includes:
+
+- email accounts and templates,
+- SMS sending support,
+- message logs and management UI.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.email</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.email.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.email:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.email.ui:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+No dedicated Node package is currently published for this extension.
+
+Frontend apps usually interact through backend APIs and actions exposed by your Dynamia application.
+
+## Java usage example
+
+```java
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import tools.dynamia.modules.email.domain.EmailMessage;
+import tools.dynamia.modules.email.services.EmailService;
+import tools.dynamia.modules.email.sms.SMSMessage;
+import tools.dynamia.modules.email.sms.SMSService;
+
+@Service
+public class NotificationService {
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private SMSService smsService;
+
+    public void sendNotification(String emailTo, String mobile, String message) {
+        var email = new EmailMessage(emailTo, "Notification", message);
+        var sms = new SMSMessage(mobile, message);
+
+        emailService.send(email);
+        smsService.send(sms);
+    }
+}
+```
+

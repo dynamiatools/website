@@ -1,0 +1,64 @@
+---
+title: File Importer
+description: Importa y procesa archivos de hoja de calculo con ejecucion asincrona y monitoreo de progreso
+---
+
+import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
+
+## Que hace esta extension
+
+File Importer facilita subir y procesar archivos de hoja de calculo (Excel), con ejecucion asincrona, monitoreo de progreso y soporte para cancelacion.
+
+Puedes implementar logica de importacion personalizada con acciones propias.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.importer</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.importer.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.importer:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.importer.ui:${dynamiaToolsVersion}'`}</code></pre>
+
+## Paquete frontend
+
+Actualmente no hay un paquete Node dedicado para esta extension.
+
+Usa los endpoints/acciones del backend desde el frontend a traves de `@dynamia-tools/sdk`.
+
+## Ejemplo de uso en Java
+
+```java
+import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.modules.importer.ui.Importer;
+
+public class ImportPeopleCrudAction extends AbstractCrudAction {
+
+    public ImportPeopleCrudAction() {
+        setName("Import");
+        setApplicableClass(Person.class);
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent evt) {
+        var importer = new Importer();
+        importer.addColumn("Code");
+        importer.addColumn("Name");
+        importer.addColumn("Start Date", "dateOfStart");
+        importer.addAction(new ImportPeopleExcelAction());
+        importer.show("Import People");
+    }
+}
+```
+

@@ -1,0 +1,117 @@
+---
+title: Soporte Vue (Beta)
+description: Construye aplicaciones Vue 3 guiadas por metadata con @dynamia-tools/vue y el SDK core
+---
+
+`@dynamia-tools/vue` es el adaptador oficial de **Vue 3** para Dynamia Platform y actualmente esta en **beta**.
+
+Se apoya en:
+
+- `@dynamia-tools/sdk` (API y metadata)
+- `@dynamia-tools/ui-core` (modelo de vistas y contratos de render)
+- Vue 3 (`>= 3.4`)
+
+## Instalacion
+
+```bash
+pnpm add vue @dynamia-tools/sdk @dynamia-tools/ui-core @dynamia-tools/vue
+```
+
+## Configuracion de la app
+
+Registra `DynamiaVue` una vez en el entry point.
+
+```typescript
+// main.ts
+import { createApp } from 'vue';
+import { DynamiaVue } from '@dynamia-tools/vue';
+import App from './App.vue';
+
+const app = createApp(App);
+app.use(DynamiaVue);
+app.mount('#app');
+```
+
+## Crea y reutiliza un solo cliente
+
+```typescript
+// src/lib/client.ts
+import { DynamiaClient } from '@dynamia-tools/sdk';
+
+export const client = new DynamiaClient({
+  baseUrl: import.meta.env.VITE_DYNAMIA_API_URL ?? 'http://localhost:8484',
+  token: import.meta.env.VITE_DYNAMIA_TOKEN,
+});
+```
+
+## Ejemplo rapido con Viewer
+
+`<DynamiaViewer>` es el componente universal que resuelve tipos de vista automaticamente.
+
+```vue
+<script setup lang="ts">
+import { useViewer } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { loading, error } = useViewer({
+  viewType: 'crud',
+  beanClass: 'com.example.Book',
+  client,
+});
+</script>
+
+<template>
+  <DynamiaViewer view-type="crud" bean-class="com.example.Book" />
+  <p v-if="loading">Cargando...</p>
+  <p v-else-if="error">{{ error }}</p>
+</template>
+```
+
+## Patron navegacion + CrudPage
+
+Para backoffice, un patron comun es:
+
+- `useNavigation(client, { autoSelectFirst: true })`
+- `<DynamiaNavMenu>` + `<DynamiaNavBreadcrumb>`
+- `<DynamiaCrudPage>` para nodos con `type === 'CrudPage'`
+
+```vue
+<script setup lang="ts">
+import { computed } from 'vue';
+import { useNavigation } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { nodes, currentPath, currentPage, currentModule, currentGroup, navigateTo } =
+  useNavigation(client, { autoSelectFirst: true });
+
+const activeNode = computed(() => currentPage.value);
+</script>
+
+<template>
+  <DynamiaNavMenu :nodes="nodes" :current-path="currentPath" @navigate="navigateTo" />
+  <DynamiaNavBreadcrumb :module="currentModule" :group="currentGroup" :page="activeNode" />
+
+  <DynamiaCrudPage
+    v-if="activeNode?.type === 'CrudPage'"
+    :node="activeNode"
+    :client="client"
+  />
+</template>
+```
+
+## Estado beta
+
+El alcance beta actual es ideal para:
+
+- UIs de backoffice guiadas por metadata,
+- aplicaciones internas centradas en CRUD,
+- prototipos rapidos con poco boilerplate.
+
+Al ser beta, algunas APIs pueden evolucionar entre versiones menores. Fija versiones y prueba upgrades.
+
+## Documentacion relacionada
+
+- [SDK Frontend](/es/frontend-sdk)
+- [Extensiones](/es/extensions/)
+- Demo app: `framework/examples/demo-vue-books`
+

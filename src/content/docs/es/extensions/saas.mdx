@@ -1,0 +1,99 @@
+---
+title: SaaS
+description: Soporte multi-tenant con gestion de cuentas, aislamiento y validaciones remotas
+---
+
+import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
+
+## Que hace esta extension
+
+SaaS habilita aplicaciones multi-tenant con aislamiento de datos por cuenta.
+
+Provee:
+
+- gestion de ciclo de vida y estado de cuentas,
+- helpers de persistencia account-aware,
+- modulos UI y remoto para operacion tenant.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas.api</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas.jpa</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas.remote</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.api:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.jpa:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.ui:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.remote:${dynamiaToolsVersion}'`}</code></pre>
+
+## Paquete frontend
+
+```bash
+pnpm add @dynamia-tools/saas-sdk @dynamia-tools/sdk
+```
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+import { SaasApi } from '@dynamia-tools/saas-sdk';
+
+const client = new DynamiaClient({ baseUrl: import.meta.env.VITE_API_URL, token: '...' });
+const saas = new SaasApi(client.http);
+
+const account = await saas.getAccount('account-uuid');
+console.log(account.name, account.status);
+```
+
+## Ejemplo de uso en Java
+
+```java
+import jakarta.persistence.Entity;
+import jakarta.validation.constraints.NotNull;
+import tools.dynamia.modules.saas.api.AccountAware;
+
+@Entity
+public class Person implements AccountAware {
+
+    @NotNull
+    private Long accountId;
+
+    @Override
+    public Long getAccountId() {
+        return accountId;
+    }
+
+    @Override
+    public void setAccountId(Long accountId) {
+        this.accountId = accountId;
+    }
+}
+```
+

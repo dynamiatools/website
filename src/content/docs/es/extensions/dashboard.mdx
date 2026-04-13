@@ -1,0 +1,73 @@
+---
+title: Dashboard
+description: Crea paginas tipo dashboard y widgets personalizados en Dynamia Platform
+---
+
+import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
+
+
+## Que hace esta extension
+
+Dashboard permite crear paginas visuales con widgets reutilizables (graficas, KPIs, tablas) usando descriptores de vista tipo `dashboard`.
+
+Casos comunes:
+
+- tableros de ventas,
+- indicadores operativos,
+- paneles de monitoreo por modulo.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.dashboard</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.dashboard:${dynamiaToolsVersion}'`}</code></pre>
+
+## Paquete frontend
+
+Actualmente no hay un paquete Node dedicado para esta extension.
+
+Usa el stack frontend base (`@dynamia-tools/sdk` o `@dynamia-tools/vue`) para consumir metadata y paginas expuestas por tu backend.
+
+## Ejemplo de uso en Java
+
+```yaml
+# mainDashboard.yml
+view: dashboard
+id: mainDashboard
+
+fields:
+  monthSales:
+    params:
+      widget: sales-chart
+      type: month
+
+  totalSales:
+    params:
+      widget: total-sales
+      range: lastMonth
+```
+
+```java
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+import tools.dynamia.zk.viewers.ViewerPage;
+
+@Provider
+public class MyAppModuleProvider implements ModuleProvider {
+
+    @Override
+    public Module getModule() {
+        var module = new Module("my-app", "My App");
+        module.addPage(new ViewerPage("sales-dashboard", "Sales Dashboard", "mainDashboard"));
+        return module;
+    }
+}
+```
+

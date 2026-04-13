@@ -1,0 +1,98 @@
+---
+title: Entity Files
+description: Attach and serve files linked to entities, with optional S3 storage
+---
+
+import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
+
+## What this extension does
+
+Entity Files lets you attach files to JPA entities and store binary content either:
+
+- on local disk (default), or
+- on AWS S3 (optional module).
+
+It also includes UI actions to manage files from CRUD views.
+
+## Maven
+
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.entityfiles</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.entityfiles.ui</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>
+
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.entityfiles.s3</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
+## Gradle
+
+<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.ui:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:${dynamiaToolsVersion}'`}</code></pre>
+
+## Frontend package
+
+```bash
+pnpm add @dynamia-tools/files-sdk @dynamia-tools/sdk
+```
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+import { FilesApi } from '@dynamia-tools/files-sdk';
+
+const client = new DynamiaClient({ baseUrl: import.meta.env.VITE_API_URL, token: '...' });
+const files = new FilesApi(client.http);
+
+const download = await files.download('invoice.pdf', 'uuid-here');
+const url = files.getUrl('images/logo.png', 'uuid-here');
+```
+
+## Java usage example
+
+```java
+import jakarta.persistence.Entity;
+import jakarta.persistence.OneToOne;
+import tools.dynamia.modules.entityfile.domain.EntityFile;
+
+@Entity
+public class Person {
+
+    @OneToOne
+    private EntityFile photo;
+
+    @OneToOne
+    private EntityFile cover;
+}
+```
+
+```java
+import java.io.File;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import tools.dynamia.modules.entityfile.UploadFileInfo;
+import tools.dynamia.modules.entityfile.service.EntityFileService;
+
+@Component
+public class PersonFilesService {
+
+    @Autowired
+    private EntityFileService entityFileService;
+
+    public void attachPhoto(File file, Person person) {
+        var info = new UploadFileInfo(file);
+        var photo = entityFileService.createEntityFile(info, person);
+        person.setPhoto(photo);
+    }
+}
+```
+

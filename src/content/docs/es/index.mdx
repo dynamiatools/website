@@ -27,7 +27,7 @@ export const version = dynamiaToolsVersion;
 
         Impulsado por **Spring Boot 4** (https://spring.io), **ZK 10** (https://www.zkoss.org) para generación automática de interfaces web, y **JPA** para persistencia de datos.
 
-        Ahora con **versionado CalVer** (AA.MM.MENOR) y todos los módulos unificados en una sola versión: **{version}** (Febrero 2026).
+        Ahora con **versionado CalVer** (AA.MM.MENOR) y todos los módulos unificados en una sola versión: **{version}** .
     </Card>
     <Card title="¿Qué puede hacer?" icon="add-document">
         * **Construir aplicaciones web full-stack** con generación automática de UI
@@ -68,15 +68,18 @@ export const version = dynamiaToolsVersion;
         Todo impulsado por una plataforma **probada en producción** utilizada por empresas en América Latina y Europa.
     </Card>
     <Card title="SDK Frontend - Construye UIs Modernas" icon="laptop">
-        El **@dynamia-tools/sdk** es la librería cliente oficial de JavaScript/TypeScript para construir frontends web modernos con React, Vue, Angular, o cualquier framework.
+        El nuevo stack frontend ahora es modular:
 
-        **Características Clave:**
-        * **Soporte completo de TypeScript** con autocompletado y seguridad de tipos
-        * **Cero dependencias en tiempo de ejecución** - Ligero y rápido
-        * **Autenticación flexible** - Tokens Bearer, autenticación básica y sesiones
+        * **@dynamia-tools/sdk** como cliente API tipado base
+        * **@dynamia-tools/vue** para UIs Vue guiadas por metadata (**beta**)
+        * SDKs de extensiones para reportes, archivos y SaaS cuando aplique
 
         <LinkButton href="/es/frontend-sdk" variant="secondary">
             Conoce más sobre el SDK →
+        </LinkButton>
+
+        <LinkButton href="/es/vue-support" variant="minimal">
+            Soporte Vue (Beta)
         </LinkButton>
     </Card>
 
@@ -95,6 +98,6 @@ export const version = dynamiaToolsVersion;
 
         Descubre las **extensiones empresariales integradas**, personaliza tu aplicación, extiende el framework y construye soluciones innovadoras con **Dynamia Platform**.
 
-        ¡Consulta el [SDK Frontend](/es/frontend-sdk) para construir interfaces web modernas con React, Vue o Angular!
+        Consulta [SDK Frontend](/es/frontend-sdk), [Soporte Vue (Beta)](/es/vue-support) y [Extensiones](/es/extensions/) para construir frontends modernos.
     </Card>
 </CardGrid>
