@@ -1,7 +1,7 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-export const dynamiaToolsVersion = '26.3.0'
+export const dynamiaToolsVersion = '26.4.0'
 
 
 // https://astro.build/config
@@ -56,7 +56,8 @@ export default defineConfig({
                         'key-concepts',
                         'custom-setup',
                         'view-descriptors',
-                        'frontend-sdk'
+                        'frontend-sdk',
+                        'vue-support'
                     ]
                 },
                 {
@@ -65,6 +66,13 @@ export default defineConfig({
                         es: 'Guías',
                     },
                     autogenerate: {directory: 'guides'},
+                },
+                {
+                    label: 'Extensions',
+                    translations: {
+                        es: 'Extensiones',
+                    },
+                    autogenerate: {directory: 'extensions'},
                 },
                 {
                     label: 'About',
