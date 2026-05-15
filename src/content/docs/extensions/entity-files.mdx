@@ -1,6 +1,6 @@
 ---
 title: Entity Files
-description: Attach and serve files linked to entities, with optional S3 storage
+description: Attach and serve files linked to entities, with optional S3 or MinIO storage
 ---
 
 import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
@@ -10,7 +10,7 @@ import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
 Entity Files lets you attach files to JPA entities and store binary content either:
 
 - on local disk (default), or
-- on AWS S3 (optional module).
+- on AWS S3 or MinIO (optional modules).
 
 It also includes UI actions to manage files from CRUD views.
 
@@ -34,11 +34,18 @@ It also includes UI actions to manage files from CRUD views.
   <version>${dynamiaToolsVersion}</version>
 </dependency>`}</code></pre>
 
+<pre><code className="language-xml">{`<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.entityfiles.minio</artifactId>
+  <version>${dynamiaToolsVersion}</version>
+</dependency>`}</code></pre>
+
 ## Gradle
 
 <pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles:${dynamiaToolsVersion}'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.ui:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:${dynamiaToolsVersion}'`}</code></pre>
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:${dynamiaToolsVersion}'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.minio:${dynamiaToolsVersion}'`}</code></pre>
 
 ## Frontend package
 
