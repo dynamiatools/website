@@ -75,6 +75,19 @@ export default defineConfig({
                     autogenerate: {directory: 'extensions'},
                 },
                 {
+                    label: 'Ecosystem',
+                    translations: {
+                        es: 'Ecosistema',
+                    },
+                    items: [
+                        {
+                            label: 'Buckie — File Server',
+                            translations: { es: 'Buckie — Servidor de Archivos' },
+                            link: 'buckie/',
+                        }
+                    ]
+                },
+                {
                     label: 'About',
                     translations: {
                         es: 'Acerca de'

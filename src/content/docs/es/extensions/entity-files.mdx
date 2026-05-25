@@ -1,18 +1,27 @@
 ---
 title: Entity Files
-description: Adjunta y expone archivos asociados a entidades, con almacenamiento opcional en S3 o MinIO
+description: Adjunta y expone archivos asociados a entidades, con almacenamiento opcional en S3, MinIO o Buckie
 ---
 
 import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
+import { LinkButton, Aside } from '@astrojs/starlight/components';
 
 ## Que hace esta extension
 
 Entity Files permite adjuntar archivos a entidades JPA y almacenar el contenido binario en:
 
-- disco local (por defecto), o
-- AWS S3 o MinIO (modulos opcionales).
+- disco local (por defecto),
+- AWS S3 o MinIO (modulos opcionales), o
+- un servidor **[Buckie](/es/buckie/)** (modulo opcional).
 
 Tambien incluye acciones UI para gestionar archivos desde vistas CRUD.
+
+<Aside type="tip" title="Buckie — servidor de archivos self-hosted">
+  **Buckie** es un servidor de archivos ligero y self-hosted con una API REST estilo S3, desarrollado por DynamiaTools.
+  Si quieres evitar dependencias de almacenamiento en la nube, Buckie es una alternativa que funciona en cualquier entorno — un VPS, Docker, hosting compartido (versión PHP) o embebido en tu app Node.js.
+
+  <LinkButton href="/es/buckie/" variant="secondary">Conoce Buckie →</LinkButton>
+</Aside>
 
 ## Maven
 

@@ -1,0 +1,271 @@
+---
+title: Buckie
+description: Servidor de archivos nativo del sistema de archivos con una API REST mínima estilo S3. Sin base de datos, un solo archivo de configuración. Implementaciones para Node.js 24 y PHP 8+.
+template: splash
+hero:
+    tagline: Un servidor de archivos ligero con una API REST estilo S3 — sin base de datos, sin cuenta en la nube, solo un proceso y un disco. Disponible para Node.js y PHP.
+    actions:
+        - text: Instalar versión Node.js
+          link: https://github.com/dynamiatools/buckie-node-js
+          icon: external
+          variant: primary
+        - text: Instalar versión PHP
+          link: https://github.com/dynamiatools/buckie-php
+          icon: external
+          variant: minimal
+---
+
+import { Card, CardGrid, Tabs, TabItem, LinkButton, Aside } from '@astrojs/starlight/components';
+
+## Tres conceptos clave
+
+<CardGrid>
+    <Card title="Bucket" icon="open-book">
+        Un puntero con nombre hacia un directorio en disco (o una ruta SFTP remota en Node.js).
+        Toda operación de archivos apunta a un bucket específico.
+    </Card>
+    <Card title="Identity" icon="approve-check-circle">
+        Un nombre de usuario + secreto hasheado con bcrypt. Piénsalo como una cuenta de servicio. Múltiples identidades pueden acceder al mismo servidor con permisos distintos.
+    </Card>
+    <Card title="Grant" icon="shield">
+        Una regla de permiso que vincula una identidad con un bucket: qué operaciones (`read`, `write`, `delete`) están permitidas, y opcionalmente restringidas a un prefijo de ruta.
+    </Card>
+</CardGrid>
+
+---
+
+## 1. Iniciar el servidor
+
+<Tabs>
+<TabItem label="Node.js">
+```bash
+# Instalar globalmente una sola vez
+npm install -g @dynamia-tools/buckie
+
+# Iniciar
+buckie serve --host 0.0.0.0 --port 8080
+```
+</TabItem>
+<TabItem label="PHP">
+```bash
+# Instalar con Composer
+composer create-project dynamia-tools/buckie mi-servidor-buckie
+cd mi-servidor-buckie
+
+# Servidor de desarrollo
+php bin/buckie serve --host 0.0.0.0 --port 8080
+
+# Producción: apunta Apache / Nginx / FrankenPHP a public/
+```
+</TabItem>
+</Tabs>
+
+<Aside type="tip">
+  En el primer arranque Buckie crea `.buckie/config.json` en el directorio de trabajo. Ese único archivo contiene todos los buckets, identidades y grants — haz un backup o inyéctalo vía Docker.
+</Aside>
+
+---
+
+## 2. Crear un bucket
+
+<Tabs>
+<TabItem label="Node.js">
+```bash
+# Sistema de archivos local
+buckie create bucket documentos /mnt/storage/documentos
+
+# Remoto SFTP (solo Node.js)
+buckie create bucket remote-docs /uploads \
+  --storage sftp \
+  --sftp-host storage.example.com \
+  --sftp-username deploy \
+  --sftp-private-key "$(cat ~/.ssh/id_rsa)"
+
+# Verificar
+buckie list buckets
+```
+</TabItem>
+<TabItem label="PHP">
+```bash
+# Solo sistema de archivos local
+php bin/buckie create bucket documentos /var/storage/documentos
+
+# Verificar
+php bin/buckie list buckets
+```
+</TabItem>
+</Tabs>
+
+---
+
+## 3. Crear una identidad y otorgar acceso
+
+<Tabs>
+<TabItem label="Node.js">
+```bash
+# Crear una identidad
+buckie create identity erp-prod mi-secreto-fuerte
+
+# Acceso completo a todo el bucket
+buckie grant erp-prod documentos --read --write --delete
+
+# O restringido a un prefijo de ruta (patrón multi-tenant)
+buckie grant erp-prod documentos --read --write --delete --prefix /tenant-a/
+
+# Verificar
+buckie list identities
+```
+</TabItem>
+<TabItem label="PHP">
+```bash
+# Crear una identidad
+php bin/buckie create identity erp-prod mi-secreto-fuerte
+
+# Acceso completo a todo el bucket
+php bin/buckie grant erp-prod documentos --read --write --delete
+
+# O restringido a un prefijo de ruta (patrón multi-tenant)
+php bin/buckie grant erp-prod documentos --read --write --delete --prefix /tenant-a/
+
+# Verificar
+php bin/buckie list identities
+```
+</TabItem>
+</Tabs>
+
+<Aside type="tip">
+  Usa `provision` para crear identidad + secreto + grant en un solo comando:
+
+  ```bash
+  # Node.js
+  buckie provision documentos --identity erp-prod --read --write --delete --prefix /tenant-a/
+
+  # PHP
+  php bin/buckie provision documentos --identity erp-prod --read --write --delete --prefix /tenant-a/
+  ```
+</Aside>
+
+---
+
+## 4. Consumir la API
+
+Se requiere autenticación en cada solicitud (excepto `/health`).
+Usa las cabeceras `X-Buckie-Identity` + `X-Buckie-Secret`, o HTTP Basic Auth.
+
+Ambas implementaciones (Node.js y PHP) exponen la **misma API REST exacta**.
+
+### Subir un archivo
+
+```bash
+curl -X PUT http://localhost:8080/documentos/tenant-a/factura.pdf \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @factura.pdf
+```
+
+### Descargar un archivo
+
+```bash
+curl http://localhost:8080/documentos/tenant-a/factura.pdf \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte" \
+  -o factura.pdf
+```
+
+### Miniatura al vuelo
+
+Redimensiona una imagen sin preprocesamiento — el resultado se almacena en caché automáticamente:
+
+```bash
+curl "http://localhost:8080/documentos/fotos/avatar.jpg?w=200&h=200&fit=cover&format=webp" \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte" \
+  -o avatar-thumb.webp
+```
+
+Parámetros soportados: `w` (ancho), `h` (alto), `fit` (`cover` | `contain` | `fill`), `format` (`webp` | `jpeg` | `png`).
+
+### Listar archivos dentro de un directorio
+
+```bash
+curl http://localhost:8080/documentos/tenant-a/ \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte"
+```
+
+### Listar todos los archivos de un bucket (paginado)
+
+```bash
+# Primera página
+curl "http://localhost:8080/documentos?limit=50" \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte"
+
+# Siguiente página usando el cursor devuelto en la respuesta anterior
+curl "http://localhost:8080/documentos?limit=50&cursor=<valor-cursor>" \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte"
+```
+
+### Eliminar un archivo
+
+```bash
+curl -X DELETE http://localhost:8080/documentos/tenant-a/factura.pdf \
+  -H "X-Buckie-Identity: erp-prod" \
+  -H "X-Buckie-Secret: mi-secreto-fuerte"
+```
+
+### Health check (público)
+
+```bash
+curl http://localhost:8080/health
+```
+
+---
+
+## Consejo Docker
+
+Monta tu `config.json` al iniciar — sin necesidad de comandos CLI de bootstrap:
+
+```yaml
+# docker-compose.yml
+services:
+  buckie:
+    image: node:24-alpine
+    command: npx @dynamia-tools/buckie serve
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./buckie-config.json:/app/.buckie/config.json:ro
+      - ./storage:/mnt/storage
+```
+
+---
+
+## Uso con Dynamia Platform
+
+[Entity Files](/es/extensions/entity-files/) — la extensión oficial de gestión de archivos de Dynamia Platform — tiene **soporte nativo para Buckie** como backend de almacenamiento. Si tienes una aplicación Dynamia Platform, puedes delegar todo el almacenamiento de archivos a un servidor Buckie con una única dependencia Maven, manteniendo tu app stateless y tus archivos en un servicio dedicado.
+
+<LinkButton href="/es/extensions/entity-files/" variant="secondary">
+  Extensión Entity Files →
+</LinkButton>
+
+---
+
+## Comparativa de implementaciones
+
+| | Node.js | PHP |
+|---|---|---|
+| **Paquete** | [`@dynamia-tools/buckie`](https://www.npmjs.com/package/@dynamia-tools/buckie) en npm | [`dynamia-tools/buckie`](https://packagist.org/packages/dynamia-tools/buckie) en Packagist |
+| **Repositorio** | [buckie-node-js](https://github.com/dynamiatools/buckie-node-js) | [buckie-php](https://github.com/dynamiatools/buckie-php) |
+| **Runtime** | Node.js 24 + Fastify | PHP 8+ (Apache / Nginx / FrankenPHP) |
+| **Almacenamiento** | Local FS + SFTP | Solo Local FS |
+| **Miniaturas** | Sharp | GD / Imagick |
+| **SDK programático** | ✅ API TypeScript completa | ❌ |
+| **Mejor para** | Alto rendimiento, uso embebido, SFTP | Hosting compartido, entornos PHP estándar |
+
+---
+
+MIT © [Dynamia Soluciones IT SAS](https://dynamia.tools)
+        Sin base de datos, sin message broker, sin cuenta en la nube. Solo un proceso y un disco. Todo el estado del servidor vive en un único archivo `config.json` — fácil de versionar, respaldar o inyectar via Docker.
