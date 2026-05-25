@@ -3,7 +3,6 @@ title: Reports
 description: Define y ejecuta reportes, filtros, exportaciones y APIs de reportes
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 
 ## Que hace esta extension
 
@@ -13,29 +12,33 @@ Incluye modulos API, core y UI.
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.reports.api</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.reports.core</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.reports.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.api:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.core:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.ui:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.api:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.core:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.reports.ui:VERSION'
+```
 
 ## Paquete frontend
 

@@ -3,7 +3,6 @@ title: File Importer
 description: Importa y procesa archivos de hoja de calculo con ejecucion asincrona y monitoreo de progreso
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 
 ## Que hace esta extension
 
@@ -13,22 +12,26 @@ Puedes implementar logica de importacion personalizada con acciones propias.
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.importer</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.importer.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.importer:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.importer.ui:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.importer:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.importer.ui:VERSION'
+```
 
 ## Paquete frontend
 

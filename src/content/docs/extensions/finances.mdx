@@ -3,7 +3,6 @@ title: Finances
 description: Financial document calculation framework for taxes, discounts, fees, and totals
 ---
 
-import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
 
 ## What this extension does
 
@@ -18,15 +17,19 @@ It focuses on:
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.finances.api</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.finances.api:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.finances.api:VERSION'
+```
 
 ## Frontend package
 

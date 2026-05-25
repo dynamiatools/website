@@ -3,7 +3,6 @@ title: Security
 description: Usuarios, perfiles, tokens y control de acceso sobre Spring Security
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 
 ## Que hace esta extension
 
@@ -18,22 +17,26 @@ Se apoya en Spring Security e incluye:
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.security</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.security.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.security:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.security.ui:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.security:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.security.ui:VERSION'
+```
 
 ## Paquete frontend
 

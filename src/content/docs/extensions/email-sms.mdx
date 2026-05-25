@@ -3,7 +3,6 @@ title: Email & SMS
 description: Async email and SMS services for Dynamia Platform
 ---
 
-import { dynamiaToolsVersion } from '../../../../astro.config.mjs';
 
 ## What this extension does
 
@@ -17,22 +16,26 @@ It includes:
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.email</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.email.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.email:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.email.ui:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.email:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.email.ui:VERSION'
+```
 
 ## Frontend package
 

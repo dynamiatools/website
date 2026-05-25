@@ -3,7 +3,6 @@ title: SaaS
 description: Soporte multi-tenant con gestion de cuentas, aislamiento y validaciones remotas
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 
 ## Que hace esta extension
 
@@ -17,43 +16,47 @@ Provee:
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.saas.api</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.saas.jpa</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.saas</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.saas.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.saas.remote</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.api:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.jpa:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.saas:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.ui:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.remote:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.api:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.jpa:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.ui:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.remote:VERSION'
+```
 
 ## Paquete frontend
 

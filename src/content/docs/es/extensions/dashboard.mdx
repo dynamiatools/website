@@ -3,7 +3,6 @@ title: Dashboard
 description: Crea paginas tipo dashboard y widgets personalizados en Dynamia Platform
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 
 
 ## Que hace esta extension
@@ -18,15 +17,19 @@ Casos comunes:
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.dashboard</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.dashboard:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.dashboard:VERSION'
+```
 
 ## Paquete frontend
 

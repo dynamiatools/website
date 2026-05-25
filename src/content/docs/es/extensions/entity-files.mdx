@@ -3,7 +3,6 @@ title: Entity Files
 description: Adjunta y expone archivos asociados a entidades, con almacenamiento opcional en S3, MinIO o Buckie
 ---
 
-import { dynamiaToolsVersion } from '../../../../../astro.config.mjs';
 import { LinkButton, Aside } from '@astrojs/starlight/components';
 
 ## Que hace esta extension
@@ -25,36 +24,42 @@ Tambien incluye acciones UI para gestionar archivos desde vistas CRUD.
 
 ## Maven
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.entityfiles</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.entityfiles.ui</artifactId>
-  <version>${dynamiaToolsVersion}</version>
+  <version>VERSION</version>
 </dependency>
 
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.entityfiles.s3</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
-<pre><code className="language-xml">{`<dependency>
+```xml
+<dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.entityfiles.minio</artifactId>
-  <version>${dynamiaToolsVersion}</version>
-</dependency>`}</code></pre>
+  <version>VERSION</version>
+</dependency>
+```
 
 ## Gradle
 
-<pre><code className="language-groovy">{`implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.ui:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:${dynamiaToolsVersion}'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.minio:${dynamiaToolsVersion}'`}</code></pre>
+```groovy
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.ui:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.minio:VERSION'
+```
 
 ## Paquete frontend
 
