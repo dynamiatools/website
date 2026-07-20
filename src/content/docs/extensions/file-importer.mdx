@@ -3,12 +3,13 @@ title: File Importer
 description: Import and process spreadsheet files with async execution and progress monitoring
 ---
 
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-File Importer helps users upload and process spreadsheet files (Excel), with asynchronous execution, progress monitoring, and cancel support.
+File Importer helps users upload and process Excel spreadsheets, with asynchronous execution, progress monitoring, and cancel support. It ships an `Importer` ZK window that shows the expected column format to the user and drives the import lifecycle.
 
-You can define custom import logic by implementing your own import action.
+You define the actual parsing logic by implementing your own `ImportExcelAction<T>` (or a lower-level `ImportAction` for non-Excel sources).
 
 ## Maven
 
@@ -39,10 +40,14 @@ No dedicated Node package is currently published for this extension.
 
 Use your backend endpoints/actions from the frontend through `@dynamia-tools/sdk`.
 
-## Java usage example
+## Wiring the import window into a CRUD action
+
+`Importer` is a ZK `Window` that lists the expected columns and hosts one or more `ImportAction`s (typically an `ImportExcelAction<T>`). Trigger it from an `AbstractCrudAction` so it shows up as a toolbar button on your entity's CRUD view:
 
 ```java
-import java.util.Date;
+//ImportPeopleCrudAction.java
+package myapp.people;
+
 import tools.dynamia.actions.ActionEvent;
 import tools.dynamia.crud.AbstractCrudAction;
 import tools.dynamia.modules.importer.ui.Importer;
@@ -59,10 +64,81 @@ public class ImportPeopleCrudAction extends AbstractCrudAction {
         var importer = new Importer();
         importer.addColumn("Code");
         importer.addColumn("Name");
-        importer.addColumn("Start Date", "dateOfStart");
+        importer.addColumn("Last Name", "lastName");   // maps to a different property name
+        importer.addColumn("Start Date", "dateOfStart", true); // required column
         importer.addAction(new ImportPeopleExcelAction());
         importer.show("Import People");
     }
 }
 ```
+
+## Custom column mapping and parsing
+
+Implement `ImportExcelAction<T>` and use the `ImportUtils` helpers to read typed cell values (`getCellValue`, `getCellValueBigDecimal`, `getCellValueLocalDate`, ...) inside a row callback. The `ProgressMonitor` argument lets long imports report progress and be cancelled from the UI.
+
+```java
+//ImportPeopleExcelAction.java
+package myapp.people;
+
+import tools.dynamia.integration.ProgressMonitor;
+import tools.dynamia.modules.importer.ImportExcelAction;
+import tools.dynamia.modules.importer.ImportUtils;
+
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+public class ImportPeopleExcelAction extends ImportExcelAction<Person> {
+
+    public ImportPeopleExcelAction() {
+        super("Import"); // shows a progress dialog while running
+    }
+
+    @Override
+    public List<Person> importFromExcel(InputStream excelFile, ProgressMonitor monitor) throws Exception {
+        var result = new ArrayList<Person>();
+
+        ImportUtils.readExcel(excelFile, monitor, row -> {
+            var code = ImportUtils.getCellValue(row, 0);
+            var name = ImportUtils.getCellValue(row, 1);
+            var lastName = ImportUtils.getCellValue(row, 2);
+            var startDate = ImportUtils.getCellValueLocalDate(row, 3);
+
+            var person = new Person();
+            person.setCode(code);
+            person.setName(name);
+            person.setLastName(lastName);
+            person.setDateOfStart(startDate);
+
+            result.add(person);
+        });
+
+        return result;
+    }
+}
+```
+
+<Aside type="note">
+  `ImportExcelAction` already implements `processImportedData()` for you: it wraps the parsed list in a single transaction and saves every row with `CrudService`. Override it only if you need custom persistence logic (upserts, validation, deduplication).
+</Aside>
+
+<CardGrid>
+  <Card title="Importer" icon="open-book">
+    ZK `Window` that declares expected columns (`addColumn`) and hosts one or more `ImportAction`s.
+  </Card>
+  <Card title="ImportExcelAction&lt;T&gt;" icon="document">
+    Base class for Excel-driven imports — implement `importFromExcel(InputStream, ProgressMonitor)`.
+  </Card>
+  <Card title="ImportUtils" icon="setting">
+    Static helpers to read/parse typed cell values (`String`, `BigDecimal`, `LocalDate`, ...) with error messages.
+  </Card>
+  <Card title="ProgressMonitor" icon="information">
+    Reports progress and cooperative cancellation for long-running imports.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Quick Reference](/reference/quick-reference)
+- [Actions Guide](/guides/actions)
 

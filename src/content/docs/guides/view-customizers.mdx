@@ -1,0 +1,163 @@
+---
+title: View Customizers
+description: Reactive UI logic that YAML can't express — ViewCustomizer<FormView<T>>, the customizer YAML key, show/hide fields, event listeners, and composing several customizers.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+[View descriptors](/view-descriptors) declaratively cover layout, labels, components, and static
+`visible`/`readonly` flags. The moment a rule depends on *runtime state* — hide this field unless
+that checkbox is on, disable a picker after the entity is saved — you need code, not YAML. That's
+what `ViewCustomizer` is for.
+
+## The interface
+
+```java
+package tools.dynamia.viewers;
+
+public interface ViewCustomizer<T extends View> extends Serializable {
+    void customize(T view);
+}
+```
+
+One method, called once per view construction, **after** the `ViewRenderer` has finished building
+every component. `T` is almost always `FormView<Entity>` — the fully built ZK form for that
+entity — so everything you'd do by hand in a ZUL controller is available: reach a field's
+component, add listeners, add/remove children.
+
+<Aside type="note">
+Implementations must have a public no-arg constructor — the framework instantiates the class
+directly by name, it does not go through Spring's context. Don't rely on `@Autowired` fields
+inside a `ViewCustomizer`; inject collaborators through a static/service-locator lookup if you
+truly need one, or (preferably) keep the logic self-contained.
+</Aside>
+
+## Wiring it from YAML
+
+Reference the fully qualified class name in the `customizer` key at the top of the descriptor —
+no registration annotation needed:
+
+```yaml
+# BookForm.yml
+view: form
+beanClass: mybookstore.domain.Book
+autofields: false
+customizer: mybookstore.customizers.BookFormCustomizer
+
+fields:
+  title:
+  onSale:
+  salePrice:
+```
+
+## Show/hide fields based on another field
+
+The canonical use case: a field that should only be visible/editable depending on the value of
+another field on the same form.
+
+```java
+//mybookstore/customizers/BookFormCustomizer.java
+package mybookstore.customizers;
+
+import mybookstore.domain.Book;
+import org.zkoss.zk.ui.event.Events;
+import org.zkoss.zul.Checkbox;
+import tools.dynamia.viewers.ViewCustomizer;
+import tools.dynamia.zk.viewers.form.FormFieldComponent;
+import tools.dynamia.zk.viewers.form.FormView;
+
+public class BookFormCustomizer implements ViewCustomizer<FormView<Book>> {
+
+    @Override
+    public void customize(FormView<Book> view) {
+        FormFieldComponent onSale = view.getFieldComponent("onSale");
+        FormFieldComponent salePrice = view.getFieldComponent("salePrice");
+
+        salePrice.hide();  // hidden by default
+
+        // Reflect the entity's current state when the form loads an existing record
+        view.addEventListener(FormView.ON_VALUE_CHANGED, event -> {
+            if (view.getValue() != null && view.getValue().isOnSale()) {
+                salePrice.show();
+            }
+        });
+
+        // React live to the checkbox while the user is editing
+        if (onSale.getInputComponent() instanceof Checkbox checkbox) {
+            checkbox.addEventListener(Events.ON_CHECK, event -> {
+                if (checkbox.isChecked()) salePrice.show(); else salePrice.hide();
+            });
+        }
+    }
+}
+```
+
+`FormView<T>` and `FormFieldComponent` API surface you'll use most:
+
+| Member | Purpose |
+|---|---|
+| `view.getFieldComponent(name)` | The `FormFieldComponent` wrapper for a field (label + input) |
+| `view.getValue()` / `view.setValue(v)` | The entity currently bound to the form |
+| `view.addEventListener(FormView.ON_VALUE_CHANGED, ...)` | Fires whenever the bound entity changes (e.g. loading a different row) |
+| `fieldComponent.hide()` / `.show()` | Toggle visibility of label + input together |
+| `fieldComponent.getInputComponent()` | The underlying ZK component (`Checkbox`, `Textbox`, ...) to attach native listeners |
+
+## Event-listener wiring beyond form fields
+
+Because `customize()` receives the fully constructed component tree, you're not limited to
+field-level toggles — add cross-field validation feedback, wire a button in the form's action
+area, or attach a listener that calls another service on `ON_VALUE_CHANGED`. Keep the customizer
+itself free of business logic; delegate to a `@Service` the same way an [Action](/guides/actions)
+would, and use it purely for the presentation wiring.
+
+## Composing several customizers
+
+`ViewDescriptor` only holds **one** customizer class (`customizer:` accepts a single FQCN) —
+there's no automatic chaining of multiple `@Component`-registered customizers the way
+[`CrudServiceListener`](/guides/crud-listeners) beans stack. If a form has several independent
+concerns to customize (visibility rules, audit-field styling, role-based access), compose them
+inside a single top-level customizer instead of trying to register several:
+
+```java
+//mybookstore/customizers/BookFormCustomizer.java
+package mybookstore.customizers;
+
+import mybookstore.domain.Book;
+import tools.dynamia.viewers.ViewCustomizer;
+import tools.dynamia.zk.viewers.form.FormView;
+
+import java.util.List;
+
+public class BookFormCustomizer implements ViewCustomizer<FormView<Book>> {
+
+    private final List<ViewCustomizer<FormView<Book>>> delegates = List.of(
+            new SalePriceVisibilityCustomizer(),
+            new AdminOnlyFieldsCustomizer(),
+            new AuditFieldsStylingCustomizer()
+    );
+
+    @Override
+    public void customize(FormView<Book> view) {
+        delegates.forEach(d -> d.customize(view));
+    }
+}
+```
+
+Each delegate stays small and independently testable; only the composing class is referenced from
+YAML.
+
+<CardGrid>
+  <Card title="One class per descriptor" icon="information">
+    `customizer:` in YAML always points to exactly one class — compose, don't try to stack several.
+  </Card>
+  <Card title="No Spring context" icon="warning">
+    Instantiated by reflection with a no-arg constructor — don't expect `@Autowired` to work here.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [View Descriptors](/view-descriptors) — the full YAML reference, including the `customizer` key.
+- [Converters](/guides/converters) — the sibling extension point for formatting instead of behavior.
+- [Actions](/guides/actions) — where the actual business logic triggered from the UI should live.
+- [Quick Reference](/reference/quick-reference) — condensed customizer cheat-sheet.

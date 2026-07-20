@@ -1,0 +1,167 @@
+---
+title: CrudServiceListener
+description: Lifecycle hooks that fire on every create/update/delete regardless of entry point — CrudServiceListenerAdapter, @Listener, and when to use a listener instead of a @Service.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+A `@Service` method runs when something calls it. A `CrudServiceListener` runs whenever
+`CrudService` performs the matching operation on the entity — whether the caller is your service,
+a REST controller, a batch import job, or the generic CRUD UI. That difference is the entire
+reason this extension point exists.
+
+## The interface
+
+```java
+package tools.dynamia.domain.util;
+
+public interface CrudServiceListener<T> {
+    default void beforeCreate(T entity) {}
+    default void afterCreate(T entity) {}
+    default void beforeUpdate(T entity) {}
+    default void afterUpdate(T entity) {}
+    default void beforeDelete(T entity) {}
+    default void afterDelete(T entity) {}
+    default void beforeQuery(QueryParameters params) {}
+    default void afterQuery(List<T> result) {}
+}
+```
+
+All eight methods are default no-ops, so `CrudServiceListenerAdapter<T>`
+(`tools.dynamia.domain.util.CrudServiceListenerAdapter`) exists purely so you only override what
+you need:
+
+```java
+//mybookstore/listeners/InvoiceCrudListener.java
+package mybookstore.listeners;
+
+import mybookstore.domain.Invoice;
+import tools.dynamia.domain.util.CrudServiceListenerAdapter;
+import tools.dynamia.integration.sterotypes.Listener;
+
+@Listener
+public class InvoiceCrudListener extends CrudServiceListenerAdapter<Invoice> {
+
+    @Override
+    public void beforeCreate(Invoice entity) {
+        entity.calcTotal();
+    }
+
+    @Override
+    public void beforeUpdate(Invoice entity) {
+        entity.calcTotal();
+    }
+}
+```
+
+`@Listener` (`tools.dynamia.integration.sterotypes.Listener`) is an alias for Spring's
+`@Component` — plain `@Component` works identically, `@Listener` just documents intent.
+
+## How dispatch actually works
+
+`JpaCrudService` collects **every** `CrudServiceListener` bean in the context and calls the
+matching method on **all of them**, for **every** entity type, on every create/update/delete:
+
+```java
+for (CrudServiceListener listener : listeners) {
+    try {
+        switch (type) {
+            case BEFORE_CREATE -> listener.beforeCreate(value);
+            // ...
+        }
+    } catch (ClassCastException e) {
+        // Ignore — this is expected for listeners typed to a different entity
+    }
+}
+```
+
+There's no filtering by entity class before the call. What actually restricts a
+`CrudServiceListenerAdapter<Invoice>` to `Invoice` events is Java generics: the compiler emits a
+synthetic bridge method that casts the incoming `Object` to `Invoice` before delegating to your
+overridden `beforeCreate(Invoice)`. When a `Book` gets created, that cast throws
+`ClassCastException` inside the bridge — the framework catches and silently ignores it. You don't
+need (and shouldn't add) an `instanceof` check inside your listener; the type parameter already
+does the filtering.
+
+<Aside type="caution">
+Because every listener bean is invoked for every entity's create/update/delete, keep unrelated
+listeners numerous-but-cheap rather than writing one giant listener with internal `instanceof`
+branching for several entity types — the per-call cost of a caught `ClassCastException` for
+non-matching types is small, but a single listener silently handling five unrelated entities is a
+readability and testability problem, not a performance one.
+</Aside>
+
+## Preventing invalid state transitions
+
+`beforeDelete`/`beforeUpdate` can throw `ValidationError` to abort the operation — the same error
+type a [`Validator`](/guides/validators) throws, so it surfaces the same way in the UI:
+
+```java
+//mybookstore/listeners/BookAuditListener.java
+package mybookstore.listeners;
+
+import mybookstore.domain.Book;
+import org.springframework.context.ApplicationEventPublisher;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.util.CrudServiceListenerAdapter;
+import tools.dynamia.integration.sterotypes.Listener;
+
+@Listener
+public class BookAuditListener extends CrudServiceListenerAdapter<Book> {
+
+    private final ApplicationEventPublisher eventPublisher;
+
+    public BookAuditListener(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Override
+    public void afterCreate(Book book) {
+        eventPublisher.publishEvent(new BookCreatedEvent(book));
+    }
+
+    @Override
+    public void beforeDelete(Book book) {
+        if (hasActiveInvoices(book)) {
+            throw new ValidationError("Cannot delete a book that appears in invoices.");
+        }
+    }
+
+    private boolean hasActiveInvoices(Book book) {
+        // check in DB
+        return false;
+    }
+}
+```
+
+## Listener vs. `Validator` vs. `@Service`
+
+| Concern | Where it belongs |
+|---|---|
+| Reject invalid input with a field-addressable error | [`Validator&lt;T&gt;`](/guides/validators) |
+| Derived value / side effect that must apply on *every* create, update, or delete — no matter what called `CrudService` | `CrudServiceListener` |
+| An explicit business workflow the caller opts into (approve an order, send a report) | `@Service` method |
+
+The deciding question for listener vs. service: **"if someone bypasses my service and calls
+`CrudService.save()` directly (from a REST controller, a script, the generic CRUD form), does this
+still need to happen?"** If yes, it's a listener — a service method only runs when explicitly
+called, a listener runs no matter which door the entity came through. `InvoiceCrudListener`
+recalculating `total` on every save is the model case: an invoice's total must never be stale,
+regardless of which code path modified its lines.
+
+<CardGrid>
+  <Card title="Global invariant" icon="approve-check">
+    `total` recalculation, audit trail, denormalized counters — always correct, everywhere.
+  </Card>
+  <Card title="Explicit workflow" icon="rocket">
+    "Approve this order" is a deliberate action a user or API caller triggers — that's a `@Service`
+    method (invoked from an [Action](/guides/actions) or controller), not a listener.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Validators](/guides/validators) — rejecting invalid data before it's ever considered for persistence.
+- [CrudService](/guides/crud-service) — the API whose operations these hooks attach to.
+- [Actions](/guides/actions) — explicit, user-triggered operations, as opposed to always-on hooks.
+- [Quick Reference](/reference/quick-reference) — condensed listener cheat-sheet.

@@ -1,58 +1,186 @@
 ---
 title: Frontend SDK
-description: The new frontend approach for Dynamia Platform with core SDK, Vue support (beta), and extension SDKs
+description: TypeScript SDK for Dynamia Platform — DynamiaClient, metadata, CRUD, actions, and the framework-agnostic ui-core view pipeline
 ---
 
-The frontend stack in Dynamia Platform now follows a **modular approach**:
+import {Card, CardGrid, Aside, LinkButton} from '@astrojs/starlight/components';
 
-1. **Core SDK**: `@dynamia-tools/sdk`
-2. **UI adapter (beta)**: `@dynamia-tools/vue`
-3. **Extension SDKs** when your backend enables extra modules (`reports`, `entity-files`, `saas`)
+The frontend stack in Dynamia Platform follows a **modular, layered approach**. Every layer above the SDK is optional — pick only what your app needs.
 
-This page explains the new approach and how to combine these packages.
+```
+@dynamia-tools/sdk         ← HTTP client, metadata, navigation, CRUD, actions (always required)
+        ↓
+@dynamia-tools/ui-core     ← ViewType → View → ViewRenderer → Viewer (framework-agnostic)
+        ↓
+@dynamia-tools/vue         ← Vue 3 composables + components (built on ui-core)
+@dynamia-tools/react (*)   ← roadmapped, not yet shipped
+```
 
-## Frontend Stack (v26)
+1. **Core SDK**: `@dynamia-tools/sdk` — typed client for every REST endpoint a Dynamia Platform backend exposes.
+2. **UI core**: `@dynamia-tools/ui-core` — the framework-agnostic view/renderer engine that Vue (and future adapters) build on.
+3. **UI adapter**: `@dynamia-tools/vue` — the official Vue 3 adapter.
+4. **Extension SDKs** when your backend enables extra modules (`reports`, `entity-files`, `saas`).
 
-### 1) Core SDK (`@dynamia-tools/sdk`)
+This page covers `@dynamia-tools/sdk` and `@dynamia-tools/ui-core` in depth. For the Vue adapter, see [Vue Support](/vue-support).
 
-The core SDK is always the base layer. It gives you typed access to metadata, navigation, CRUD, and actions.
+## `@dynamia-tools/sdk`
+
+The core SDK is a fully typed, zero-runtime-dependency client. It covers application metadata, the navigation tree, entity CRUD (both by virtual path and by class name), actions, and — through `client.http` — the shared `HttpClient` used by every extension SDK.
 
 ```bash
 pnpm add @dynamia-tools/sdk
 ```
 
+### Creating a client
+
 ```typescript
 import { DynamiaClient } from '@dynamia-tools/sdk';
 
 export const client = new DynamiaClient({
-  baseUrl: import.meta.env.VITE_API_URL,
+  // baseUrl is the app origin — SDK calls already include the /api/... path
+  baseUrl: 'https://app.example.com',
   token: localStorage.getItem('auth_token') ?? undefined,
 });
 ```
 
-### 2) Vue support (`@dynamia-tools/vue`) - Beta
+<Aside type="caution">
+  `baseUrl` is the **app origin**, not an API prefix. Every SDK call already builds the full path
+  (for example `/api/app/metadata`, `/api/{crudPath}`), so passing something like
+  `https://app.example.com/api` will duplicate the `/api` segment.
+</Aside>
 
-If you are building a Vue 3 app, use the official Vue adapter.
+`DynamiaClientConfig` accepts:
 
-```bash
-pnpm add vue @dynamia-tools/vue @dynamia-tools/ui-core @dynamia-tools/sdk
+| Option | Type | Description |
+|---|---|---|
+| `baseUrl` | `string` | App origin, e.g. `https://app.example.com` |
+| `token` | `string?` | Bearer / access token |
+| `username` / `password` | `string?` | HTTP Basic credentials (server-to-server) |
+| `withCredentials` | `boolean?` | Forward cookies for session-based auth |
+| `fetch` | `typeof fetch` | Custom fetch implementation (Node.js, tests) |
+
+### Metadata and navigation
+
+`client.metadata` maps to `GET /api/app/metadata` and its sub-resources:
+
+```typescript
+const app = await client.metadata.getApp();
+const nav = await client.metadata.getNavigation();
+const actions = await client.metadata.getGlobalActions();
+const entities = await client.metadata.getEntities();
+const book = await client.metadata.getEntity('com.example.Book');
+const descriptors = await client.metadata.getEntityViews('com.example.Book');
+const formDescriptor = await client.metadata.getEntityView('com.example.Book', 'form');
 ```
 
-See the dedicated guide: [Vue Support (Beta)](/vue-support).
+<Aside type="danger" title="Common mistake">
+  `client.metadata.getNavigation()` returns a **`NavigationTree`**, shaped as
+  `{ navigation: NavigationNode[] }` — it is **not** a `{ modules, groups, pages }` object.
+  Walk the tree through `NavigationNode.children`, and use `NavigationNode.internalPath` for routing.
+</Aside>
 
-### 3) Extension SDKs (optional)
+```typescript
+interface NavigationTree { navigation: NavigationNode[]; }
+interface NavigationNode {
+  id: string;
+  name: string;
+  type?: string;          // "Module" | "PageGroup" | "Page" | "CrudPage" | ...
+  internalPath?: string;  // route path used by frontends
+  path?: string;          // display path
+  children?: NavigationNode[];
+}
+```
 
-Install these only when your backend uses the corresponding extension:
+```typescript
+const tree = await client.metadata.getNavigation();
 
-- `@dynamia-tools/reports-sdk`
-- `@dynamia-tools/files-sdk`
-- `@dynamia-tools/saas-sdk`
+tree.navigation.forEach(module => {
+  console.log(module.name);
+  module.children?.forEach(groupOrPage => {
+    groupOrPage.children?.forEach(page => {
+      console.log(`  ${page.name} → ${page.internalPath}`);
+    });
+  });
+});
+```
 
-See [Extensions](/extensions/) for installation and usage details.
+### CRUD by virtual path
 
-## Recommended Architecture
+`client.crud(path)` targets the auto-generated REST endpoints for any `CrudPage` registered in the platform's navigation, where `path` is the page's virtual path:
 
-Use one shared `DynamiaClient` and pass `client.http` to extension SDKs.
+```typescript
+const booksApi = client.crud('store/catalog/books');
+
+const page = await booksApi.findAll({ page: 1, size: 20, q: 'clean code' });
+// page.content    → Book[]
+// page.total      → total records
+// page.page       → current page number
+// page.pageSize   → current page size
+// page.totalPages → total pages
+
+const book = await booksApi.findById(42);
+const created = await booksApi.create({ title: 'Clean Code', author: 'Robert C. Martin' });
+const updated = await booksApi.update(42, { title: 'Clean Code (2nd Ed.)' });
+await booksApi.delete(42);
+```
+
+`findAll()` resolves to a `CrudListResult<T>`:
+
+```typescript
+interface CrudListResult<T = unknown> {
+  content: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+```
+
+| Method | Endpoint | SDK call |
+|---|---|---|
+| `GET` | `/api/{path}` | `crud(path).findAll(params?)` |
+| `GET` | `/api/{path}/{id}` | `crud(path).findById(id)` |
+| `POST` | `/api/{path}` | `crud(path).create(entity)` |
+| `PUT` | `/api/{path}/{id}` | `crud(path).update(id, entity)` |
+| `DELETE` | `/api/{path}/{id}` | `crud(path).delete(id)` |
+
+### CRUD by class name
+
+`client.crudService(className)` is the low-level alternative that targets `/crud-service/{className}` directly with a fully-qualified Java class name — useful when you know the domain class but not (or don't need) its `CrudPage` virtual path:
+
+```typescript
+const svc = client.crudService('com.example.domain.Book');
+
+const saved = await svc.save({ title: 'Domain-Driven Design' }); // create or update
+const book = await svc.findById('42');
+await svc.delete('42');
+const results = await svc.find({ author: 'Evans' });
+const id = await svc.getId({ isbn: '978-0321125217' });
+```
+
+### Actions
+
+Execute global or entity-scoped actions registered in the platform:
+
+```typescript
+await client.actions.executeGlobal('exportBooksToExcel', {
+  params: { format: 'xlsx' },
+});
+
+await client.actions.executeEntity(
+  'com.example.domain.Order', // entity class name
+  'approveOrder',             // action id
+  { data: { orderId: 99 }, params: { notify: true } },
+);
+```
+
+### Extension SDKs (optional)
+
+Install these only when your backend enables the corresponding extension. They all share `client.http` — the same authenticated `HttpClient` used internally by `DynamiaClient` — so you never configure auth twice:
+
+- `@dynamia-tools/reports-sdk` → `ReportsApi`
+- `@dynamia-tools/files-sdk` → `FilesApi`
+- `@dynamia-tools/saas-sdk` → `SaasApi`
 
 ```typescript
 import { DynamiaClient } from '@dynamia-tools/sdk';
@@ -61,7 +189,7 @@ import { FilesApi } from '@dynamia-tools/files-sdk';
 import { SaasApi } from '@dynamia-tools/saas-sdk';
 
 const client = new DynamiaClient({
-  baseUrl: import.meta.env.VITE_API_URL,
+  baseUrl: 'https://app.example.com',
   token: localStorage.getItem('auth_token') ?? undefined,
 });
 
@@ -70,40 +198,24 @@ export const files = new FilesApi(client.http);
 export const saas = new SaasApi(client.http);
 ```
 
-## Core Capabilities in the New Flow
+See [Extensions](/extensions/) for full installation and usage details.
 
-### Metadata and Navigation
+### Authentication
 
-```typescript
-const app = await client.metadata.getApp();
-const navigation = await client.metadata.getNavigation();
-console.log(app.name, navigation.navigation.length);
-```
+The same auth model is shared by every SDK package through `HttpClient`:
 
-### CRUD by virtual path
+- `token` — Bearer auth (recommended for SPAs)
+- `username` + `password` — HTTP Basic auth (server-to-server)
+- `withCredentials: true` — forwards session cookies (Spring Security form login at `POST /login`)
 
-```typescript
-const booksApi = client.crud('library/books');
-const page = await booksApi.findAll({ page: 1, size: 20, q: 'clean code' });
-```
+<Aside type="note">
+  The SDK does not ship a `login()` helper. Perform login with your preferred HTTP client (or plain
+  `fetch`), then instantiate `DynamiaClient` with the resulting token or with `withCredentials: true`.
+</Aside>
 
-### Global and entity actions
+### Error handling
 
-```typescript
-await client.actions.executeGlobal('exportBooksToExcel', {
-  params: { format: 'xlsx' },
-});
-```
-
-## Authentication
-
-The same auth model is reused across all frontend SDK packages through the same `HttpClient`:
-
-- `token` for Bearer auth (recommended for SPA)
-- `username` + `password` for Basic auth
-- `withCredentials: true` for cookie/session-based auth
-
-## Error Handling
+Every SDK method throws a `DynamiaApiError` on a non-2xx response, exposing `status`, `url`, and `body` for centralized logging and UI error mapping:
 
 ```typescript
 import { DynamiaApiError } from '@dynamia-tools/sdk';
@@ -112,17 +224,145 @@ try {
   await client.crud('library/books').findById(999999);
 } catch (error) {
   if (error instanceof DynamiaApiError) {
-    console.error(`[${error.status}] ${error.message}`);
+    console.error(`[${error.status}] ${error.message} (${error.url})`);
   }
 }
 ```
 
+## `@dynamia-tools/ui-core`
+
+`@dynamia-tools/ui-core` is the framework-agnostic view engine underneath `@dynamia-tools/vue`. It has **zero DOM or framework dependency** — it runs equally well in Node.js, a browser, or a Web Worker — and implements the same `ViewType → View → ViewRenderer → Viewer` pipeline that renders view descriptors on the Java backend (see [View Descriptors](/view-descriptors) and the `Viewer` component in `tools.dynamia.zk.viewers.ui`). This is what makes a Vue, and eventually React, adapter a thin rendering layer instead of a reimplementation.
+
+```bash
+pnpm add @dynamia-tools/ui-core @dynamia-tools/sdk
+```
+
+`@dynamia-tools/sdk` is a peer dependency — `ui-core` reuses its types (`ViewDescriptor`, `EntityMetadata`, `NavigationTree`, …) instead of redefining them.
+
+<CardGrid>
+  <Card title="ViewType" icon="setting">
+    An open extension object, not a closed enum — `ViewTypes.Form`, `ViewTypes.Table`, `ViewTypes.Crud`,
+    `ViewTypes.Tree`, `ViewTypes.Config`, `ViewTypes.EntityPicker`, `ViewTypes.EntityFilters`,
+    `ViewTypes.Export`, `ViewTypes.Json`. Modules can register new ones (e.g. `{ name: 'kanban' }`)
+    without touching `ui-core`.
+  </Card>
+  <Card title="View" icon="document">
+    Abstract base class owning the descriptor, entity metadata, values, validation, and an event
+    emitter. Concrete subclasses: `FormView`, `TableView`, `CrudView`, `TreeView`, `ConfigView`,
+    `EntityPickerView`.
+  </Card>
+  <Card title="ViewRenderer" icon="puzzle">
+    Per-`ViewType` interface (`FormRenderer`, `TableRenderer`, `CrudRenderer`, `FieldRenderer`, …) that
+    a UI framework adapter implements to turn a `View` into actual output — a Vue component, a React
+    element, etc.
+  </Card>
+  <Card title="Viewer" icon="rocket">
+    The single entry point. Mirrors the Java `Viewer` ZK component: resolves a descriptor
+    (by `beanClass` + `viewType`, by `descriptorId`, or a pre-loaded `descriptor`) and drives the
+    matching `View` through `ViewRendererRegistry`.
+  </Card>
+</CardGrid>
+
+### Viewer resolution flow
+
+```typescript
+import { Viewer } from '@dynamia-tools/ui-core';
+import { DynamiaClient } from '@dynamia-tools/sdk';
+
+const client = new DynamiaClient({ baseUrl: 'https://app.example.com', token: '...' });
+
+const viewer = new Viewer({ viewType: 'form', beanClass: 'com.example.Book', client });
+await viewer.initialize();
+
+viewer.setValue({ title: 'Clean Code' });
+viewer.on('submit', (values) => saveToBackend(values));
+
+const view = viewer.view;       // FormView | TableView | CrudView | ...
+const actions = viewer.getActions(); // ActionMetadata[]
+```
+
+1. `descriptorId` set → fetched via `client.metadata`.
+2. `descriptor` set → used directly (skips the network round-trip).
+3. Otherwise → fetched via `client.metadata.getEntityView(beanClass, viewType)`.
+4. The resolved descriptor is handed to `ViewRendererRegistry.createView(viewType, descriptor, metadata)`.
+5. `value`, `source`, and `readOnly` are applied to the resulting view.
+
+### FormView, TableView, and CrudView
+
+`FormView` resolves fields (inferring the UI component from the Java field type when the descriptor doesn't specify one), computes the grid layout, and validates required fields. `TableView` manages rows, pagination, sorting, search, and row selection through an injected `loader` callback — it never calls the network directly, matching the [error-handling boundary](#error-handling) established by the SDK. `CrudView` orchestrates a `FormView` and a `TableView` together behind a `list | create | edit` mode state machine.
+
+```typescript
+import { TableView } from '@dynamia-tools/ui-core';
+
+const table = new TableView(descriptor, metadata);
+
+table.setLoader(async (params) => {
+  const result = await client.crud('store/books').findAll(params);
+  return {
+    rows: result.content,
+    pagination: {
+      page: result.page,
+      pageSize: result.pageSize,
+      totalSize: result.total,
+      pagesNumber: result.totalPages,
+      firstResult: (result.page - 1) * result.pageSize,
+    },
+  };
+});
+
+await table.initialize();
+await table.load();
+```
+
+### Navigation helpers
+
+`ui-core` also ships stateless helpers for app-shell navigation, reusable from Vue, React, or plain TypeScript — they power `useNavigation` in `@dynamia-tools/vue`:
+
+```typescript
+import { findNodeByPath, findFirstPage, resolveActivePath } from '@dynamia-tools/ui-core';
+import type { NavigationTree } from '@dynamia-tools/sdk';
+
+const tree: NavigationTree = await client.metadata.getNavigation();
+
+const page = findNodeByPath(tree.navigation, '/pages/store/books');
+const first = findFirstPage(tree.navigation);
+const ctx = resolveActivePath(tree, '/pages/store/books'); // { module, group, page }
+```
+
+### Why it matters
+
+Because `ui-core` owns every piece of view logic — field resolution, layout, validation, pagination, mode transitions — a new framework adapter only has to implement rendering, not behavior. That is the whole difference between `@dynamia-tools/vue` and a hypothetical React adapter.
+
+<Aside type="note" title="React adapter">
+  A `@dynamia-tools/react` adapter is on the roadmap (see the `ui-core` architecture diagram:
+  `ReactViewer`, `ReactFormView`, hooks and components reusing `ui-core` the same way Vue does), but it
+  has **not shipped yet**. Today, `@dynamia-tools/vue` is the only framework adapter built on `ui-core`.
+</Aside>
+
+## Recommended architecture
+
+Use one shared `DynamiaClient`, pass `client.http` to extension SDKs, and let `ui-core` (directly, or through `@dynamia-tools/vue`) own the view layer:
+
+```typescript
+import { DynamiaClient } from '@dynamia-tools/sdk';
+import { ReportsApi } from '@dynamia-tools/reports-sdk';
+
+const client = new DynamiaClient({
+  baseUrl: 'https://app.example.com',
+  token: localStorage.getItem('auth_token') ?? undefined,
+});
+
+export const reports = new ReportsApi(client.http);
+```
+
 ## Next Steps
 
-- Read [Vue Support (Beta)](/vue-support)
-- Explore [Extensions](/extensions/)
-- Review the package docs in the monorepo:
+<LinkButton href="/vue-support">Vue Support</LinkButton>
+<LinkButton href="/extensions/" variant="secondary">Extensions</LinkButton>
+<LinkButton href="/view-descriptors" variant="secondary">View Descriptors</LinkButton>
+
+- Package sources in the monorepo:
   - `platform/packages/sdk`
+  - `platform/packages/ui-core`
   - `platform/packages/vue`
   - `extensions/*/packages/*-sdk`
-

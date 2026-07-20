@@ -1,0 +1,168 @@
+---
+title: Entities
+description: How JPA entities work in Dynamia Platform — BaseEntity, audit fields, toString() for pickers, relationship/cascade conventions, and UI-only transient fields.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Entities are the domain layer: plain JPA classes that `CrudService`, the CRUD UI, and the view
+descriptor engine all operate on without any extra wiring. The only requirement to get that for
+free is extending `tools.dynamia.domain.jpa.BaseEntity` — everything else is standard
+`jakarta.persistence`.
+
+## `BaseEntity`: what you get for free
+
+`BaseEntity` sits at the bottom of a small hierarchy (`SimpleEntity` → `BaseEntityWithJavaTimes`
+→ `BaseEntity`) and contributes two things: the identity strategy and the audit trail.
+
+```java
+//mybookstore/domain/Book.java
+package mybookstore.domain;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import tools.dynamia.domain.jpa.BaseEntity;
+
+@Entity
+@Table(name = "books")
+@OrderBy("title")                        // default ordering in listings
+public class Book extends BaseEntity {
+
+    @NotNull
+    private String title;
+
+    @ManyToOne
+    private Category category;
+
+    // getters/setters
+}
+```
+
+| Field | Type | Managed by |
+|---|---|---|
+| `id` | `Long`, `@GeneratedValue(IDENTITY)` | Set on insert |
+| `version` | `int`, `@Version` | Optimistic locking, incremented on every update |
+| `creationDate` / `creationTime` / `creationTimestamp` | `LocalDate` / `LocalTime` / `LocalDateTime` | Set once, on first save |
+| `creator` | `String` (username) | Set once, on first save |
+| `lastUpdate` | `LocalDateTime` | Refreshed on every save |
+| `lastUpdater` | `String` (username) | Refreshed on every save |
+| `remoteId` | `Long` | Optional, for entities synced from an external system |
+
+<Aside type="note">
+`creator`/`lastUpdater` are the acting user's **username as a `String`**, not a `@ManyToOne` to a
+`User` entity — don't add a redundant `createdBy` relation unless you specifically need to join
+against the user table.
+</Aside>
+
+You never set any of these fields by hand — `JpaCrudService` populates them around
+`create`/`save`/`update`. If you need to backdate a migrated record, `BaseEntity` exposes
+`resetCreationDate(LocalDateTime)` for exactly that.
+
+## Always override `toString()`
+
+Every place the framework needs a human-readable label for an entity instance — combo boxes,
+`entitypicker` popups, `entityreflabel` cells, breadcrumbs in a `coollabel` — falls back to
+`toString()`. Skipping the override means your users see `Book@3f9a1c2` in every picker.
+
+```java
+@Override
+public String toString() {
+    return title;
+}
+```
+
+For entities without one obvious display field, compose one (`lastName + ", " + firstName`), but
+keep it short — it's rendered inline in dropdowns and search results.
+
+## Relationships and cascade conventions
+
+The rule of thumb: **cascade and orphan-remove children that don't make sense without their
+parent**; leave references to independent entities alone.
+
+```java
+//mybookstore/domain/Book.java
+@Entity
+@Table(name = "books")
+public class Book extends BaseEntity {
+
+    @ManyToOne                                // independent entity: no cascade
+    private Category category;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookReview> reviews = new ArrayList<>();   // dependent: dies with the book
+
+    @OneToOne
+    private EntityFile bookCover;             // file attachment, from the entity-files extension
+
+    @Override
+    public String toString() { return title; }
+}
+```
+
+- Initialize collections at declaration (`= new ArrayList<>()`) — never leave a `@OneToMany` null.
+- `@ManyToOne` is eager by default in JPA; that's fine for lightweight lookups like `Category`,
+  but watch out for N+1 when a table renders many rows each pulling a heavier association — use
+  a projection or `queryProjection: true` on the `crud`/`table` descriptor instead of fighting
+  fetch types field by field.
+- `@Enumerated(EnumType.STRING)` — never leave `@Enumerated` without `EnumType.STRING` on a new
+  entity. Ordinal storage silently corrupts data the moment someone reorders or inserts an enum
+  constant.
+- File attachments go through `EntityFile` (`tools.dynamia.modules.entityfile`, `@OneToOne`), not
+  a raw `byte[]` column — it gives you storage backend abstraction and the `entityfileImage` /
+  `imageOnly` view components for free.
+
+## `@Transient` fields for UI-only state
+
+Entities frequently need a bit of state that exists only for the current view — a checkbox on a
+table row, a computed flag — and must never reach the database or a JSON payload.
+
+```java
+@Transient
+@JsonIgnore
+private boolean selected;   // bound to a checkbox column, never persisted
+
+public boolean isSelected() { return selected; }
+public void setSelected(boolean selected) { this.selected = selected; }
+```
+
+`@Transient` (from `jakarta.persistence`) keeps Hibernate from mapping the field; `@JsonIgnore`
+(Jackson) keeps it out of REST/API responses. Use both together unless you deliberately want the
+field serialized.
+
+## Business logic belongs on the entity — up to a point
+
+An entity is not an anemic bag of getters and setters. Self-contained state transitions that
+don't need a collaborator are legitimate entity methods:
+
+```java
+public boolean isOnSale() {
+    return onSale && salePrice != null;
+}
+
+public void markSoldOut() {
+    this.stockStatus = StockStatus.OUT_OF_STOCK;
+}
+```
+
+The line: **the moment a method needs an injected Spring bean (email, another service, a query),
+it doesn't belong on the entity anymore.** Entities are never Spring beans and can't be
+constructor-injected — that logic moves to a `@Service`. See
+[Development Patterns](/guides/development-patterns) for the anemic-entity and business-logic
+anti-patterns in more depth.
+
+<CardGrid>
+  <Card title="Cross-field/DB rules" icon="approve-check">
+    Belong in a [`Validator&lt;T&gt;`](/guides/validators), not in `@PrePersist`/`@PreUpdate`.
+  </Card>
+  <Card title="Lifecycle side effects" icon="setting">
+    Recurring calculations that must run on every create/update regardless of caller go in a
+    [`CrudServiceListener`](/guides/crud-listeners).
+  </Card>
+</CardGrid>
+
+## Related
+
+- [CrudService](/guides/crud-service) — the persistence API entities are read/written through.
+- [Validators](/guides/validators) — business-rule validation before an entity is saved.
+- [View Descriptors](/view-descriptors) — how entity fields map to forms and tables.
+- [Quick Reference](/reference/quick-reference) — condensed entity conventions cheat-sheet.

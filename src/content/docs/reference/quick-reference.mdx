@@ -1,0 +1,455 @@
+---
+title: Quick Reference
+description: A terse, code-verified cheat-sheet for DynamiaTools backend and frontend development — stereotypes, entities, CrudService, navigation, actions, validators, listeners, customizers, and the full YAML view-descriptor syntax.
+---
+
+import {Card, CardGrid, Aside, LinkButton} from '@astrojs/starlight/components';
+
+One page, minimal prose. For explanations and rationale follow the links to the [Guides](/guides/entities) section — this page only shows the shape of things.
+
+---
+
+## Stereotype annotations
+
+DynamiaTools defines its own meta-annotations in `tools.dynamia.integration.sterotypes.*`. They are aliases of the Spring stereotypes but signal intent inside the framework — prefer them over raw `@Component`/`@Service` in framework-facing code.
+
+| Annotation | Alias for | Use it on |
+|---|---|---|
+| `@Provider` | `@Component` | `ModuleProvider` implementations (registers modules/navigation) |
+| `@Listener` | `@Component` | `CrudServiceListener` / `CrudServiceListenerAdapter` |
+| `@Service` | Spring `@Service` | Business services |
+| `@Repository` | Spring `@Repository` | Repositories |
+| `@Controller` | Spring `@Controller` | Classic MVC/REST controllers |
+| `@Component` | Spring `@Component` | Generic beans (customizers, converters, validators) |
+| `@InstallAction` | — | `Action`/`AbstractCrudAction` classes, auto-registered |
+| `@InstallValidator` | — | `Validator<T>` implementations, auto-registered |
+
+See [Navigation guide](/guides/navigation) and [Actions guide](/guides/actions) for full detail.
+
+---
+
+## Entity conventions
+
+```java
+//Book.java
+package mybookstore.domain;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import tools.dynamia.domain.jpa.BaseEntity;
+
+@Entity
+@Table(name = "books")
+@OrderBy("title")                 // default ordering in listings
+public class Book extends BaseEntity {
+
+    @NotNull
+    private String title;
+
+    @ManyToOne
+    private Category category;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private java.util.List<BookReview> reviews = new java.util.ArrayList<>();
+
+    @Override
+    public String toString() {
+        return title;             // used by pickers/references in the UI
+    }
+    // getters/setters
+}
+```
+
+| Rule | Why |
+|---|---|
+| Extend `BaseEntity` | Gives `id`, `creationDate`/`creationTime`/`creationTimestamp`, `creator`, `lastUpdate`, `lastUpdater` for free (`creator`/`lastUpdater` are `String` usernames, not a `User` relation) |
+| Override `toString()` | Combos, pickers, and reference labels render it |
+| `cascade = ALL, orphanRemoval = true` on dependent `@OneToMany` | Child rows die with the parent (e.g. `BookReview` of `Book`) |
+| File attachments via `EntityFile` (`@OneToOne`) | From the `entity-files` extension, not a raw byte column |
+| `@Transient @JsonIgnore` for UI-only fields | Keeps them out of persistence and JSON payloads |
+
+Full walkthrough: [Entities guide](/guides/entities).
+
+---
+
+## CrudService method catalogue
+
+Inject `tools.dynamia.domain.services.CrudService` — never touch `EntityManager`/`Session` directly in application services.
+
+| Method | Purpose |
+|---|---|
+| `create(entity)` | Forces an insert |
+| `save(entity)` | Insert or update based on `id` |
+| `update(entity)` | Forces an update |
+| `delete(entity)` / `delete(Class, id)` | Removes a row |
+| `find(Class, id)` | Load by primary key |
+| `find(Class, QueryParameters)` / `findAll(Class, ...)` | Declarative filtered queries |
+| `count(Class, QueryParameters)` | Row count without loading entities |
+| `findByExample(example)` | Query-by-example matching |
+| `findByFields(Class, value, fields...)` | Dynamic search across several fields (autocomplete-style) |
+| `executeQuery(QueryBuilder, params)` | Reusable complex JPQL |
+| `executeProjection(Class, query, params)` | `count`/`sum`/`max`/`avg` projections |
+| `batchUpdate(...)` / `updateField(...)` | Bulk updates without loading full entities |
+| `increaseCounter(...)` / `deacreaseCounter(...)` | Atomic counter columns (note: the decrease method is genuinely spelled `deacreaseCounter` in the API) |
+| `saveWithinTransaction(...)` / `executeWithinTransaction(...)` | Work outside the current transaction |
+
+```java
+//BookService.java
+package mybookstore.services;
+
+import org.springframework.stereotype.Service;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.domain.query.QueryParameters;
+
+@Service
+public class BookService {
+
+    private final CrudService crudService;
+
+    public BookService(CrudService crudService) {
+        this.crudService = crudService;
+    }
+
+    public java.util.List<Book> findByCategory(Category category) {
+        return crudService.find(Book.class,
+                QueryParameters.with("category", category).orderBy("title", true));
+    }
+}
+```
+
+Full method list and query patterns: [CrudService guide](/guides/crud-service).
+
+---
+
+## Navigation — Module / PageGroup / CrudPage
+
+```java
+//CrmModuleProvider.java
+package crm;
+
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+import tools.dynamia.navigation.PageGroup;
+
+@Provider
+public class CrmModuleProvider implements ModuleProvider {
+
+    @Override
+    public Module getModule() {
+        Module module = new Module("crm", "CRM").icon("business").position(10);
+
+        PageGroup contacts = new PageGroup("contacts-group", "Contacts")
+                .addPage(new CrudPage("contacts", "All Contacts", Contact.class));
+
+        return module.addPageGroup(contacts);
+    }
+}
+```
+
+| Pattern | Result |
+|---|---|
+| `new CrudPage(id, name, Entity.class)` | Auto-generates list + form + delete |
+| `new CrudPage(id, name, Entity.class, "customCrudServiceName")` | Same, backed by a non-default `CrudService` bean |
+| `new Page(id, name, "classpath:/pages/x.zul")` | Custom ZUL page |
+| `new ExternalPage(id, name, url)` | External link as a page |
+| `.icon()`, `.description()`, `.position()` | Fluent chain on `Module`/`Page`/`CrudPage` |
+
+Details: [Navigation guide](/guides/navigation).
+
+---
+
+## Actions
+
+```java
+//FilterBookByBuyDateAction.java
+package mybookstore.actions;
+
+import tools.dynamia.actions.AbstractCrudAction;
+import tools.dynamia.actions.CrudActionEvent;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.viewers.util.UIMessages;
+
+@InstallAction
+public class FilterBookByBuyDateAction extends AbstractCrudAction {
+
+    public FilterBookByBuyDateAction() {
+        setName("Filter By Buy Date");
+        setApplicableClass(Book.class);
+        setImage("calendar");
+        setPosition(1);
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        UIMessages.showInput("Select Buy Date", java.time.LocalDate.class, date -> {
+            if (date != null) {
+                evt.getController().setParemeter("buyDate", date);
+                evt.getController().doQuery();
+            }
+        });
+    }
+}
+```
+
+- `@InstallAction` self-registers — no `@Provider` needed.
+- `setApplicableClass(Entity.class)` scopes it to that entity's CRUD toolbar/table.
+- Override no-arg `isEnabled()` / `isVisible()` for conditional rules.
+- `CrudActionEvent.getController()` reaches the current query/selection.
+
+Details: [Actions guide](/guides/actions).
+
+---
+
+## Validators & Converters
+
+```java
+//ContactEmailValidator.java
+package crm.validators;
+
+import tools.dynamia.domain.Validator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.InstallValidator;
+
+@InstallValidator
+public class ContactEmailValidator implements Validator<Contact> {
+
+    @Override
+    public void validate(Contact contact) throws ValidationError {
+        if (contact.getEmail() == null) {
+            throw new ValidationError("Email is required", null, "email", Contact.class);
+        }
+    }
+}
+```
+
+`validate()` returns `void` — there is no list of errors to build. Each failing rule throws
+`ValidationError` immediately; the optional `(value, property, entityClass)` arguments let the UI
+highlight the specific field.
+
+<Aside type="caution">
+Validation belongs in `Validator&lt;T&gt;`, never in the entity's `@PrePersist`/lifecycle callbacks.
+</Aside>
+
+Converters transform display values in tables/exports — reference them by name in YAML (`converters.Currency`, `converters.Date`, …), resolved against `tools.dynamia.zk.converters.*`. See the [View descriptor cheat-sheet](#view-descriptor-cheat-sheet) below and the [Converters guide](/guides/converters) for writing custom ones.
+
+Details: [Validators guide](/guides/validators).
+
+---
+
+## CrudServiceListener
+
+```java
+//InvoiceCrudListener.java
+package sales.listeners;
+
+import tools.dynamia.domain.util.CrudServiceListenerAdapter;
+import tools.dynamia.integration.sterotypes.Listener;
+
+@Listener
+public class InvoiceCrudListener extends CrudServiceListenerAdapter<Invoice> {
+
+    @Override
+    public void beforeCreate(Invoice entity) {
+        entity.calcTotal();
+    }
+
+    @Override
+    public void beforeUpdate(Invoice entity) {
+        entity.calcTotal();
+    }
+}
+```
+
+Use for derived calculations/side effects that must fire on every create/update/delete regardless of entry point — not just the one `@Service` that happens to call `CrudService` today.
+
+Details: [CrudServiceListener guide](/guides/crud-listeners).
+
+---
+
+## ViewCustomizer
+
+```java
+//BookFormViewCustomizer.java
+package mybookstore.customizers;
+
+import tools.dynamia.viewers.ViewCustomizer;
+import tools.dynamia.zk.viewers.form.FormFieldComponent;
+import tools.dynamia.zk.viewers.form.FormView;
+
+public class BookFormViewCustomizer implements ViewCustomizer<FormView<Book>> {
+
+    @Override
+    public void customize(FormView<Book> view) {
+        FormFieldComponent salePrice = view.getFieldComponent("salePrice");
+        salePrice.hide();
+
+        view.addEventListener(FormView.ON_VALUE_CHANGED, event -> {
+            if (view.getValue() != null && view.getValue().isOnSale()) {
+                salePrice.show();
+            }
+        });
+    }
+}
+```
+
+Wire it from the YAML descriptor with `customizer: fully.qualified.ClassName` — no registration annotation needed, it's instantiated by class name.
+
+Details: [ViewCustomizers guide](/guides/view-customizers).
+
+---
+
+## View descriptor cheat-sheet
+
+Files live under `META-INF/descriptors/`, named `{Entity}Crud.yml`, `{Entity}Form.yml`, `{Entity}Table.yml`, `{Entity}Tree.yml`, `{Entity}Json.yml`, `{Entity}Filters.yml`. `beanClass` is always the FQCN. Prefer `autofields: false` for explicit control — `autofields: true` exposes every bean field, including ones you don't want on screen.
+
+Full syntax, every component and param: [View Descriptors reference](/view-descriptors).
+
+### `crud` — bundles form + table + actions
+
+```yaml
+# BookCrud.yml
+view: crud
+beanClass: mybookstore.domain.Book
+autofields: false
+params:
+  queryProjection: true
+```
+
+### `form`
+
+```yaml
+# BookForm.yml
+view: form
+beanClass: mybookstore.domain.Book
+autofields: false
+customizer: mybookstore.customizers.BookFormViewCustomizer
+
+fields:
+  title:
+    params:
+      span: 2
+  category:                     # @ManyToOne -> automatic combo
+  price:
+    params:
+      format: $###,###
+  reviews:
+    component: crudview         # embedded sub-CRUD for @OneToMany
+
+layout:
+  columns: 4
+```
+
+### `table`
+
+```yaml
+# BookTable.yml
+view: table
+beanClass: mybookstore.domain.Book
+autofields: false
+
+fields:
+  title:
+  stockStatus:
+    component: enumlabel
+  price:
+    params:
+      converter: converters.Currency
+      header: { align: right }
+
+params:
+  orderBy: title
+```
+
+### `tree` — hierarchies (parent/child)
+
+```yaml
+# CategoryTree.yml
+view: tree
+beanClass: mybookstore.domain.Category
+autofields: false
+fields:
+  name:
+    params:
+      header: { width: 300px }
+  description:
+```
+
+### `json` — projection for APIs/autocomplete
+
+```yaml
+# CategoryJson.yml
+view: json
+beanClass: mybookstore.domain.Category
+autofields: false
+fields:
+  name:
+  parent.id:               # dot-path to nested property
+params:
+  conditions:
+    onlyParents: 'parent is null'
+```
+
+### `entityfilters` — filter panel for table/crud
+
+```yaml
+# BookFilters.yml
+view: entityfilters
+beanClass: mybookstore.domain.Book
+autofields: false
+fields:
+  title:
+  category:
+  stockStatus:
+    component: enumlabel
+```
+
+---
+
+## New CRUD entity — checklist
+
+1. Entity `extends BaseEntity`, override `toString()`, correct JPA annotations.
+2. `Validator<T>` + `@InstallValidator` only if rules go beyond bean validation (`@NotNull`, etc).
+3. `CrudServiceListener` + `@Listener` only if there are lifecycle side effects.
+4. `CrudPage` inside a `ModuleProvider` (`@Provider`) to expose it in navigation.
+5. YAML descriptors under `META-INF/descriptors/`: at minimum `{Entity}Form.yml` + `{Entity}Table.yml`, or a single `{Entity}Crud.yml` if `autofields` defaults are enough.
+6. `@InstallAction` + `AbstractCrudAction` (with `setApplicableClass`) only for operations beyond standard CRUD.
+7. `ViewCustomizer` only for reactive UI logic the YAML can't express declaratively.
+
+---
+
+## Anti-patterns
+
+- Anemic entities — domain methods like `isActive()`/`calcTotal()` belong on the entity.
+- Entity methods that depend on injected services — that logic belongs in a `@Service`.
+- Raw `EntityManager`/JPQL in application services instead of `CrudService`/`QueryBuilder`.
+- Field injection (`@Autowired` on a field) — use constructor injection.
+- Swallowing exceptions (`catch (Exception e) { e.printStackTrace(); }`) — log and propagate/report.
+- `autofields: true` in production descriptors without auditing which fields it exposes.
+- Validating inside `@PrePersist`/entity lifecycle callbacks instead of a `Validator<T>`.
+
+---
+
+## Frontend SDK quick reference
+
+```ts
+import { DynamiaClient } from '@dynamia-tools/sdk';
+
+const client = new DynamiaClient({ baseUrl: 'https://app.example.com' });
+
+const nav = await client.metadata.getNavigation();     // NavigationTree.navigation
+const books = await client.crud('books').findAll();    // CrudListResult: content, total, page, pageSize, totalPages
+```
+
+| API | Notes |
+|---|---|
+| `new DynamiaClient({ baseUrl, token? })` | Entry point; `baseUrl` is the app origin, SDK paths already include `/api/...` |
+| `client.metadata.getNavigation()` | Menus/routing, shape is `NavigationTree.navigation` |
+| `client.crud(path)` | `CrudPage` virtual path — `findAll`/`findById`/`create`/`update`/`delete` |
+| `client.crudService(className)` | Class-name based `/crud-service` access |
+| `DynamiaApiError` | `status`, `url`, `body` on failed calls |
+
+Vue: register once with `app.use(DynamiaVue)`, then use `DynamiaViewer`, `DynamiaForm`, `DynamiaTable`, `DynamiaCrud`, `DynamiaCrudPage`, `DynamiaNavMenu` and composables `useViewer`, `useForm`, `useTable`, `useCrud`, `useCrudPage`, `useEntityPicker`, `useNavigation`.
+
+Full walkthrough: see the Start Here [Frontend SDK](/frontend-sdk) and [Vue Support](/vue-support) pages.

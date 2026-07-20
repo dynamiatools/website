@@ -3,14 +3,15 @@ title: Dashboard
 description: Build dashboard pages and custom widgets in Dynamia Platform
 ---
 
+import { Aside, Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Dashboard lets you build visual pages with reusable widgets (charts, KPI boxes, tables) using a `dashboard` view descriptor.
+Dashboard lets you build visual pages composed of reusable **widgets** (KPI boxes, charts, tables, custom ZK components) declared in a `dashboard` view descriptor — the same YAML-driven approach used for `form` and `table` descriptors elsewhere in the framework.
 
 Typical use cases:
 
-- sales overview,
+- executive / sales overview,
 - operations KPIs,
 - module-specific monitoring panels.
 
@@ -36,7 +37,9 @@ No dedicated Node package is currently published for this extension.
 
 Use the core frontend stack (`@dynamia-tools/sdk` or `@dynamia-tools/vue`) to consume metadata and pages exposed by your backend.
 
-## Java usage example
+## How it works
+
+A dashboard is a `view: dashboard` descriptor. Each `field` maps to one widget instance, identified by the widget's `id` (set via the `widget` param). Extra params under the same field are passed to the widget at render time through `DashboardContext`.
 
 ```yaml
 # mainDashboard.yml
@@ -51,11 +54,21 @@ fields:
 
   totalSales:
     params:
-      widget: total-sales
-      range: lastMonth
+      widget: total-sales   # widget id, matches DashboardWidget#getId()
+      range: lastMonth      # custom param, read from DashboardContext
+
+  newProducts:
+    params:
+      widget: products-table
+      type: NEW
 ```
 
+Register the dashboard with a `ViewerPage` inside your `ModuleProvider`, exactly like any other view descriptor:
+
 ```java
+//MyAppModuleProvider.java
+package myapp;
+
 import tools.dynamia.integration.sterotypes.Provider;
 import tools.dynamia.navigation.Module;
 import tools.dynamia.navigation.ModuleProvider;
@@ -67,9 +80,152 @@ public class MyAppModuleProvider implements ModuleProvider {
     @Override
     public Module getModule() {
         var module = new Module("my-app", "My App");
+        // (pageId, name, dashboardId)
         module.addPage(new ViewerPage("sales-dashboard", "Sales Dashboard", "mainDashboard"));
         return module;
     }
 }
 ```
 
+## Building custom widgets
+
+Widgets implement `DashboardWidget<V>` — in practice you extend `AbstractDashboardWidget<V>`, where `V` is the ZK component type the widget renders. Annotate the class with `@InstallDashboardWidget` so it is auto-discovered at startup; a new widget **instance** is created every time its dashboard page is opened and lives for as long as the page stays open.
+
+```java
+//TotalSalesDashboardWidget.java
+package myapp.dashboard;
+
+import tools.dynamia.modules.dashboard.AbstractDashboardWidget;
+import tools.dynamia.modules.dashboard.DashboardContext;
+import tools.dynamia.modules.dashboard.InstallDashboardWidget;
+import tools.dynamia.zk.ui.Infobox;
+
+import java.math.BigDecimal;
+import java.text.DecimalFormat;
+
+/**
+ * Infobox widget showing total sales for a configurable range.
+ */
+@InstallDashboardWidget
+public class TotalSalesDashboardWidget extends AbstractDashboardWidget<Infobox> {
+
+    private BigDecimal totalSales;
+    private Long numberOfSales;
+
+    public TotalSalesDashboardWidget() {
+        setTitle("Total Sales");
+    }
+
+    /** Matches the `widget:` value used in the view descriptor. */
+    @Override
+    public String getId() {
+        return "total-sales";
+    }
+
+    /** Called once when the widget is created; use context to read descriptor params. */
+    @Override
+    public void init(DashboardContext context) {
+        String range = (String) context.getField().getParam("range");
+        if ("lastMonth".equals(range)) {
+            this.totalSales = computeTotalSales();
+            this.numberOfSales = computeNumberOfSales();
+        }
+    }
+
+    /** Called on every render; return the ZK component to display. */
+    @Override
+    public Infobox getView() {
+        var infobox = new Infobox();
+        infobox.setIcon("fa fa-tags");
+        infobox.setBackground("bg-primary color-white");
+        infobox.setText("Total Sales");
+        if (totalSales != null) {
+            infobox.setNumber(DecimalFormat.getCurrencyInstance().format(totalSales));
+            infobox.setProgressDescription(numberOfSales + " sales");
+            infobox.setShowProgress(true);
+            infobox.setProgress(100);
+        }
+        return infobox;
+    }
+
+    private BigDecimal computeTotalSales() {
+        // query your data with CrudService / QueryParameters
+        return BigDecimal.ZERO;
+    }
+
+    private Long computeNumberOfSales() {
+        return 0L;
+    }
+}
+```
+
+<Aside type="note">
+  `init(context)` runs again every time the widget is reinitialized (e.g. a manual refresh action), and `getView()` runs on every re-render — keep `getView()` cheap and put data fetching in `init()`.
+</Aside>
+
+## Chart widgets
+
+For Chart.js-backed widgets, extend `ChartjsDashboardWidget` instead of `AbstractDashboardWidget` directly. It wraps the `Chartjs` ZK component and gives you two ready-made color palettes (`MATERIAL_COLORS`, `DYNAMIA`).
+
+```java
+//SalesByMonthChartWidget.java
+package myapp.dashboard;
+
+import tools.dynamia.modules.dashboard.ChartjsDashboardWidget;
+import tools.dynamia.modules.dashboard.DashboardContext;
+import tools.dynamia.modules.dashboard.InstallDashboardWidget;
+import tools.dynamia.zk.ui.chartjs.Chartjs;
+import tools.dynamia.zk.ui.chartjs.ChartjsData;
+
+@InstallDashboardWidget
+public class SalesByMonthChartWidget extends ChartjsDashboardWidget {
+
+    public SalesByMonthChartWidget() {
+        setTitle("Sales by Month");
+    }
+
+    @Override
+    public String getId() {
+        return "sales-chart";
+    }
+
+    @Override
+    public ChartjsData initChartjsData(DashboardContext context) {
+        var data = new ChartjsData();
+        data.setColorPalette(DYNAMIA);
+        // populate labels/datasets from your query results
+        return data;
+    }
+
+    @Override
+    public String getChartjsType() {
+        return "bar"; // bar | line | pie | doughnut | radar ...
+    }
+
+    @Override
+    protected void customizeChart(Chartjs chart) {
+        // optional: tweak chart options before rendering
+    }
+}
+```
+
+<CardGrid>
+  <Card title="AbstractDashboardWidget<V>" icon="puzzle">
+    Base class for any widget. Implement `getId()`, `init(context)`, `getView()`.
+  </Card>
+  <Card title="ChartjsDashboardWidget" icon="approve-check">
+    Base class for Chart.js widgets. Implement `initChartjsData()` and `getChartjsType()`.
+  </Card>
+  <Card title="@InstallDashboardWidget" icon="add-document">
+    Marks a widget for auto-registration — no manual wiring needed.
+  </Card>
+  <Card title="DashboardContext" icon="setting">
+    Gives access to the descriptor field/params bound to this widget instance.
+  </Card>
+</CardGrid>
+
+## Related
+
+<LinkButton href="/reference/quick-reference" variant="secondary">Quick Reference</LinkButton>
+<LinkButton href="/view-descriptors" variant="secondary">View Descriptors</LinkButton>
+<LinkButton href="/guides/actions" variant="secondary">Actions Guide</LinkButton>

@@ -1,8 +1,9 @@
 ---
 title: SaaS
-description: Multi-tenant support with account management, isolation, and remote checks
+description: Multi-tenant support with account management, isolation, remote checks, and tenant migration
 ---
 
+import { Aside } from '@astrojs/starlight/components';
 
 ## What this extension does
 
@@ -46,6 +47,13 @@ It provides:
   <artifactId>tools.dynamia.modules.saas.remote</artifactId>
   <version>VERSION</version>
 </dependency>
+
+<!-- Optional: Tenant Mobility (export/import/clone/backup/restore) -->
+<dependency>
+  <groupId>tools.dynamia.modules</groupId>
+  <artifactId>tools.dynamia.modules.saas.migration</artifactId>
+  <version>VERSION</version>
+</dependency>
 ```
 
 ## Gradle
@@ -56,6 +64,7 @@ implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.jpa:VERSION'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.saas:VERSION'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.ui:VERSION'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.remote:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.saas.migration:VERSION' // optional
 ```
 
 ## Frontend package
@@ -99,4 +108,169 @@ public class Person implements AccountAware {
     }
 }
 ```
+
+## Tenant Mobility (Migration)
+
+The **Tenant Mobility** sub-module (`tools.dynamia.modules.saas.migration`) provides full lifecycle management for tenant data: export, import, clone, backup, and restore. Every operation runs as an **async background job** on virtual threads, so exporting/importing millions of rows never blocks the request thread.
+
+| Operation | Description |
+|---|---|
+| `EXPORT` | Serialize all tenant data to a versioned ZIP archive (one JSON file per entity) |
+| `IMPORT` | Restore tenant data from a previously exported ZIP archive |
+| `CLONE` | Duplicate a tenant within the same system, under a different `accountId` |
+| `BACKUP` | Alias for `EXPORT`, tagged as a backup |
+| `RESTORE` | Alias for `IMPORT` that replaces existing data |
+
+<Aside type="caution" title="Roadmap — not yet fully implemented">
+  `MIGRATE` (cross-environment export + remote import in one step) and the `UUID7` identity strategy are listed in the migration module's README as **planned**, not shipped. Build cross-environment moves today as an `EXPORT` followed by a manual `IMPORT` on the target environment, and use `KEEP_IDS` or `REGENERATE_IDS` (see below) instead of `UUID7`.
+</Aside>
+
+### Excluding data from export
+
+```java
+//LoginAuditLog.java
+package myapp.audit;
+
+import jakarta.persistence.Entity;
+import tools.dynamia.modules.saas.api.AccountExportIgnore;
+import tools.dynamia.modules.saas.jpa.SimpleEntitySaaS;
+
+// Suppress the entire entity from export/import
+@Entity
+@AccountExportIgnore
+public class LoginAuditLog extends SimpleEntitySaaS {
+    // ...
+}
+```
+
+```java
+//Customer.java
+package myapp.crm;
+
+import jakarta.persistence.Entity;
+import tools.dynamia.modules.saas.api.ExportIgnore;
+import tools.dynamia.modules.saas.jpa.SimpleEntitySaaS;
+
+@Entity
+public class Customer extends SimpleEntitySaaS {
+
+    @ExportIgnore
+    private String cachedScore; // computed field, do not export
+}
+```
+
+### Launching jobs via REST
+
+```http
+POST /api/saas/migration/jobs/export/42
+Content-Type: application/json
+
+{
+  "chunkSize": 500,
+  "identityStrategy": "KEEP_IDS"
+}
+```
+
+```http
+GET /api/saas/migration/jobs/abc-123
+```
+
+```http
+GET /api/saas/migration/jobs/abc-123/download
+```
+
+The response of a completed export job is a ZIP archive named `Account42_20260614T100500.zip`.
+
+```http
+POST /api/saas/migration/jobs/import
+Content-Type: multipart/form-data
+
+file=@Account42_20260614T100500.zip
+targetAccountId=99
+identityStrategy=REGENERATE_IDS
+```
+
+```http
+POST /api/saas/migration/jobs/clone
+Content-Type: application/json
+
+{
+  "sourceAccountId": 42,
+  "targetAccountId": 99,
+  "identityStrategy": "REGENERATE_IDS"
+}
+```
+
+Full REST surface:
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/saas/migration/jobs/export/{accountId}` | Start export job |
+| `POST` | `/api/saas/migration/jobs/import` | Start import job (multipart) |
+| `POST` | `/api/saas/migration/jobs/clone` | Start clone job |
+| `POST` | `/api/saas/migration/jobs/backup/{accountId}` | Start backup job |
+| `POST` | `/api/saas/migration/jobs/restore/{accountId}` | Start restore job (multipart) |
+| `GET`  | `/api/saas/migration/jobs` | List all jobs |
+| `GET`  | `/api/saas/migration/jobs/{jobId}` | Get job status & progress |
+| `POST` | `/api/saas/migration/jobs/{jobId}/cancel` | Cancel a running job |
+| `GET`  | `/api/saas/migration/jobs/{jobId}/download` | Download result ZIP |
+
+### Identity strategies
+
+| Strategy | Status | Description |
+|---|---|---|
+| `KEEP_IDS` | Shipped | Preserve original database IDs — suitable for cross-environment restore into an empty target DB |
+| `REGENERATE_IDS` | Shipped | Assign new auto-generated IDs — safe for cloning within the same DB |
+| `UUID7` | Planned | Use UUIDv7 for all IDs — not yet available |
+
+### Export format (v3)
+
+Every export is a ZIP archive with a manifest plus one JSON file per entity type:
+
+```
+Account42_20260614T100500.zip
+├── manifest.json              ← metadata + ordered entity list
+├── Account42_Customer.json
+├── Account42_Product.json
+└── Account42_Order.json
+```
+
+```json
+// manifest.json
+{
+  "version": "3",
+  "exportedAt": "2026-06-14T10:05:00",
+  "sourceAccountId": 42,
+  "identityStrategy": "KEEP_IDS",
+  "account": { "id": 42, "name": "Acme Corp" },
+  "entities": [
+    { "file": "Account42_Customer.json", "entityClass": "com.example.Customer" },
+    { "file": "Account42_Order.json",    "entityClass": "com.example.Order" }
+  ]
+}
+```
+
+Relationship fields (`@ManyToOne`, `@OneToOne`) are serialized as `{fieldName}_ref_id`; collections (`@OneToMany`, `@ManyToMany`) are reconstructed naturally when child entities reference their parents. Entity files are written in parallel (up to `export-parallelism` concurrent virtual threads) and assembled into the ZIP in topological order.
+
+### Configuration
+
+```yaml
+# application.yml
+dynamia:
+  saas:
+    migration:
+      chunk-size: 500                                  # records per pagination page
+      output-directory: ${java.io.tmpdir}/saas-migration
+      max-concurrent-jobs: 5
+      export-parallelism: 4                             # entity types exported concurrently per job
+      fail-on-entity-error: false                        # stop on first error vs. log and continue
+```
+
+### Extension points (SPI)
+
+| Interface | Description |
+|---|---|
+| `IdentityMapper` | Custom ID mapping strategy |
+| `MigrationProgressListener` | Hook for progress events |
+| `CancellationToken` | Cooperative cancellation signal |
 

@@ -1,19 +1,22 @@
 ---
 title: Finances
-description: Financial document calculation framework for taxes, discounts, fees, and totals
+description: Financial document calculation framework for taxes, discounts, withholdings, fees, and totals
 ---
 
+import { Aside, Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Finances provides a calculation engine for financial documents.
+Finances is a **pure Java calculation engine** for financial documents (invoices, quotes, credit/debit notes, purchase orders). It focuses exclusively on the math:
 
-It focuses on:
+- deterministic totals — same inputs, same outputs, always,
+- charge ordering by **priority**,
+- taxes, discounts, withholdings, and fees unified under a single `Charge` abstraction,
+- currency-aware calculations via `Money` and `ExchangeRate`.
 
-- deterministic totals,
-- charge ordering by priority,
-- support for taxes, discounts, withholdings, and fees,
-- currency-aware calculations.
+<Aside type="note">
+  This module has **no JPA, no UI, no accounting, and no country-specific tax rules** — it's a domain-only library you compose into your own invoicing/POS/ERP module. See [Colombia e-invoicing](#extending-for-a-specific-country) below for how a country-specific extension is built on top of it.
+</Aside>
 
 ## Maven
 
@@ -35,36 +38,142 @@ implementation 'tools.dynamia.modules:tools.dynamia.modules.finances.api:VERSION
 
 No dedicated Node package is currently published for this extension.
 
-This module is mainly a backend/domain calculation framework.
+This module is a backend/domain calculation library — persistence, REST exposure, and UI belong to the layer you build on top of it.
 
-## Java usage example
+## Core model
+
+| Type | Role |
+|---|---|
+| `FinancialDocument` | Root document: `type`, `status`, `party`, `currency`, `exchangeRate`, `lines`, document-level `charges`, calculated `totals` |
+| `DocumentLine` | One economic line: `description`, `quantity`, `unitPrice`, line-level `charges`, `totals` |
+| `Charge` | Single abstraction for taxes/discounts/withholdings/fees — `type`, `rateType`, `value`, `appliesTo`, `base`, `priority` |
+| `Money` | Immutable amount + currency code; arithmetic (`add`, `subtract`, `multiply`, `percentage`) never crosses currencies silently |
+| `ExchangeRate` | Immutable `fromCurrency` → `toCurrency` rate frozen at a `date`; `convert(Money)` applies it |
+| `FinancialCalculator` | Stateless engine: `calculateDocument()`, `calculateLine()`, `recalculate()` |
+
+### `ChargeType` — what a charge represents
+
+| Value | Meaning |
+|---|---|
+| `TAX` | VAT, sales tax, excise duties |
+| `DISCOUNT` | Commercial, promotional, volume-based reductions |
+| `WITHHOLDING` | Income tax retention, social security deductions |
+| `FEE` | Shipping, handling, environmental charges |
+
+### `RateType` — how the charge value is interpreted
+
+| Value | Meaning |
+|---|---|
+| `PERCENTAGE` | `value` is a percentage of the base (e.g. `19` → 19%) |
+| `FIXED` | `value` is a fixed amount in the document currency |
+| `FORMULA` | Custom calculation, resolved by a `ChargeStrategy` |
+
+Charges are applied in ascending **`priority`** order — a later charge can be computed on the result of an earlier one (e.g. tax calculated after a discount is applied).
+
+## Building and calculating an invoice
+
+`DocumentLine` and `FinancialDocument` expose convenience methods (`addTax`, `addDiscount`, `addWithholding`, `addFee`) so you rarely construct `Charge` objects by hand:
 
 ```java
+//InvoiceCalculationExample.java
+package myapp.billing;
+
+import tools.dynamia.modules.finances.api.*;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
-FinancialDocument invoice = new FinancialDocument();
-invoice.setType(DocumentType.SALE);
-invoice.setStatus(DocumentStatus.DRAFT);
-invoice.setIssueDate(LocalDate.now());
-invoice.setCurrency("USD");
+public class InvoiceCalculationExample {
 
-DocumentLine line = new DocumentLine();
-line.setDescription("Product A");
-line.setQuantity(new BigDecimal("10"));
-line.setUnitPrice(Money.of("100", "USD"));
+    public FinancialDocument calculate() {
+        var invoice = FinancialDocument.of(DocumentType.SALE, "USD");
+        invoice.setStatus(DocumentStatus.DRAFT);
+        invoice.setIssueDate(LocalDate.now());
 
-Charge vat = new Charge();
-vat.setCode("VAT19");
-vat.setType(ChargeType.TAX);
-vat.setRateType(RateType.PERCENTAGE);
-vat.setValue(new BigDecimal("19"));
-vat.setPriority(20);
+        var line = DocumentLine.of("Product A", 10, Money.of("100", "USD"));
+        line.addDiscount("DISC10", "Volume discount", new BigDecimal("10"), 10);   // priority 10
+        line.addTax("VAT19", "Value Added Tax", new BigDecimal("19"), 20);          // priority 20, after discount
+        invoice.addLine(line);
 
-line.addCharge(vat);
-invoice.addLine(line);
+        // Document-level fee, applied once regardless of line count
+        invoice.addFee("SHIP", "Shipping", new BigDecimal("15"));
 
-FinancialCalculator calculator = new DefaultFinancialCalculator();
-calculator.calculateDocument(invoice);
+        FinancialCalculator calculator = new DefaultFinancialCalculator();
+        calculator.calculateDocument(invoice);
+
+        DocumentTotals totals = invoice.getTotals();
+        System.out.println("Subtotal: " + totals.getSubTotal());
+        System.out.println("Discount: " + totals.getDiscountTotal());
+        System.out.println("Tax: " + totals.getTaxTotal());
+        System.out.println("Grand total: " + totals.getGrandTotal());
+        System.out.println("Payable: " + totals.getPayableTotal()); // grandTotal - withholdingTotal
+
+        return invoice;
+    }
+}
 ```
 
+<Aside type="tip">
+  `recalculate(document)` only works while the document is `DRAFT` — once `POSTED`, totals are frozen by design (`InvalidDocumentStateException` if you try). Model reversals as a `CREDIT_NOTE`/`DEBIT_NOTE`, not as a mutation of a posted document.
+</Aside>
+
+## Multi-currency documents
+
+```java
+//MultiCurrencyExample.java
+package myapp.billing;
+
+import tools.dynamia.modules.finances.api.ExchangeRate;
+import tools.dynamia.modules.finances.api.Money;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+Money priceInEUR = Money.of("500", "EUR");
+ExchangeRate rate = ExchangeRate.of("EUR", "USD", new BigDecimal("1.08"), LocalDate.now());
+
+Money priceInUSD = rate.convert(priceInEUR);
+```
+
+The document stores the `ExchangeRate` it was calculated with — the engine never queries a live rate provider, keeping calculations deterministic and auditable.
+
+## Explicit `Charge` construction
+
+For cases the convenience methods don't cover (custom `base`, `refundable` charges, `FORMULA` rate type), build a `Charge` directly:
+
+```java
+Charge withholding = new Charge();
+withholding.setCode("WHOLD25");
+withholding.setType(ChargeType.WITHHOLDING);
+withholding.setRateType(RateType.PERCENTAGE);
+withholding.setValue(new BigDecimal("2.5"));
+withholding.setAppliesTo(ChargeAppliesTo.DOCUMENT);
+withholding.setBase(ChargeBase.PREVIOUS_TOTAL);
+withholding.setPriority(30);
+
+invoice.addCharge(withholding);
+```
+
+## Extending for a specific country
+
+The framework deliberately excludes tax legislation, electronic invoicing, and numbering — those belong in a country-specific layer built on top of it. The framework's own repository includes a worked example, **Colombia DIAN e-invoicing** (`extensions/finances/docs/COLOMBIA-INVOICING.md`), showing how to add IVA/ReteFuente/ReteICA rules, CUFE generation, and UBL XML output without touching the core engine — a useful reference architecture if you need to build your own regional adapter.
+
+<CardGrid>
+  <Card title="FinancialDocument" icon="document">
+    Root document — type, status, party, currency, lines, document-level charges, totals.
+  </Card>
+  <Card title="Charge" icon="approve-check">
+    Unified taxes/discounts/withholdings/fees with priority-ordered application.
+  </Card>
+  <Card title="Money / ExchangeRate" icon="seti:lock">
+    Immutable, currency-safe value objects — no silent cross-currency math.
+  </Card>
+  <Card title="FinancialCalculator" icon="setting">
+    Stateless engine — `calculateDocument`, `calculateLine`, `recalculate`.
+  </Card>
+</CardGrid>
+
+## Related
+
+<LinkButton href="/reference/quick-reference" variant="secondary">Quick Reference</LinkButton>
+<LinkButton href="/guides/entities" variant="secondary">Entities Guide</LinkButton>

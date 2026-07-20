@@ -1,44 +1,299 @@
 ---
 title: How Actions Work
+description: Actions encapsulate reusable behavior — toolbar buttons, table links, bulk operations, long-running jobs — that Dynamia Platform auto-discovers via @InstallAction.
 ---
 
-**Actions** are a core concept in DynamiaTools. They let you encapsulate reusable behavior in different parts of the application: buttons, menus, table cells, toolbars, and more.
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
-## Defining an Action
+**Actions** are the standard unit of executable behavior in Dynamia Platform. Instead of wiring
+click handlers by hand, you write a small class that describes *what* the action does and
+*where* it applies, annotate it with `@InstallAction`, and the framework takes care of
+discovering it, rendering it as a button/menu-item/link, and invoking it when the user
+interacts with it.
 
-You typically define a class that extends `AbstractCrudAction` or implements `Action`.
+Actions show up in CRUD toolbars, table row links, page menus, and can also be exposed as a
+public execution endpoint (`Action.execute(ActionExecutionRequest)`) for REST-driven or
+headless flows.
+
+## The Action hierarchy
+
+| Base class / interface        | Use it for                                                                 |
+|--------------------------------|-----------------------------------------------------------------------------|
+| `Action`                       | The root contract: id, name, image, `isEnabled()`, `isVisible()`, `actionPerformed`. Rarely implemented directly. |
+| `AbstractAction`                | Convenient base with getters/setters already implemented. Good for standalone actions not tied to an entity. |
+| `ApplicationGlobalAction`       | Global, application-wide actions — always available regardless of context (help, settings, logout-style utilities). |
+| `CrudAction` / `AbstractCrudAction` | Actions scoped to CRUD views: table toolbars, row links, form buttons. Adds `setApplicableClass`, `getApplicableStates()`. |
+
+In practice you will extend `AbstractAction` for a generic action and `AbstractCrudAction` for
+anything tied to an entity's table or form.
+
+## Registering an action: `@InstallAction`
+
+`@InstallAction` marks the class as a **prototype-scoped Spring bean**. The framework scans the
+context at startup, instantiates one per use, and makes it available to toolbars, menus, and
+`link` fields in [view descriptors](/view-descriptors) by its `name`.
 
 ```java
+//demo/actions/HelpAction.java
 package demo.actions;
 
 import tools.dynamia.actions.AbstractAction;
 import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.actions.ApplicationGlobalAction;
 import tools.dynamia.actions.InstallAction;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
 
 @InstallAction
-public class PrintHelloAction extends AbstractCrudAction {
+public class HelpAction extends ApplicationGlobalAction {
 
-    public PrintHelloAction() {
-        setId("PrintHelloAction");
-        setName("Say Hello");
-        setApplicableClass(Person.class); // Optional: limit this action to Person entities
+    public HelpAction() {
+        setId("HelpAction");
+        setName("Help");
+        setImage("help");
     }
 
     @Override
-    public void actionPerformed(CrudActionEvent evt) {
-        System.out.println("Hello from Dynamia Action");
+    public void actionPerformed(ActionEvent evt) {
+        UIMessages.showMessage("Visit https://dynamia.tools for documentation.", MessageType.INFO);
     }
 }
 ```
 
-## Registering and using the Action
+Because `ApplicationGlobalAction` extends `AbstractAction`, no wiring beyond the annotation is
+needed — it becomes available application-wide the moment the context loads.
 
-With `@InstallAction`, Dynamia automatically discovers it in the Spring context.
+## CRUD-entity actions
 
+An entity-scoped action extends `AbstractCrudAction` and restricts itself to a class with
+`setApplicableClass(...)`. Inside `actionPerformed`, the current row/entity arrives through
+`CrudActionEvent`, which extends `ActionEvent` and additionally exposes the CRUD
+`CrudControllerAPI` (`evt.getController()`) so you can refresh the query, read the current
+selection, or set filter parameters.
+
+```java
+//mybookstore/actions/MarkOutOfStockAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import mybookstore.domain.StockStatus;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
+
+@InstallAction
+public class MarkOutOfStockAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public MarkOutOfStockAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("MarkOutOfStockAction");
+        setName("Mark Out of Stock");
+        setApplicableClass(Book.class);
+        setImage("warning");
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        Book book = (Book) evt.getData();
+        if (book == null) {
+            UIMessages.showMessage("Please select a book first.", MessageType.WARNING);
+            return;
+        }
+        book.setStockStatus(StockStatus.OUT_OF_STOCK);
+        crudService.save(book);
+        UIMessages.showMessage("Book marked as out of stock.", MessageType.SUCCESS);
+    }
+}
+```
+
+`evt.getData()` carries the row bean when the action is triggered from a table link or a
+selected row; `evt.getController().getEntity()` gives you the entity currently loaded in the
+form. Both are valid depending on where the action is bound — check whichever matches the
+view you attached it to.
+
+<Aside type="tip">
+Keep `actionPerformed` thin: validate context, delegate the actual mutation to a Spring
+`@Service`, and use `UIMessages` for feedback. This keeps the action reusable if you later
+trigger the same logic from a scheduler or REST endpoint.
+</Aside>
+
+## Bulk actions
+
+The same `AbstractCrudAction` shape works for bulk operations — the difference is purely in
+what you do with the selection inside `actionPerformed`. When bound to a multi-select table,
+iterate the affected rows and report a single summary message instead of one message per row:
+
+```java
+//mybookstore/actions/BulkDiscountAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
+
+import java.util.List;
+
+@InstallAction
+public class BulkDiscountAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public BulkDiscountAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("BulkDiscountAction");
+        setName("Apply 10% Discount");
+        setApplicableClass(Book.class);
+        setImage("percent");
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void actionPerformed(CrudActionEvent evt) {
+        List<Book> selected = (List<Book>) evt.getData();
+        if (selected == null || selected.isEmpty()) {
+            UIMessages.showMessage("Select at least one book.", MessageType.WARNING);
+            return;
+        }
+
+        selected.forEach(book -> {
+            book.setDiscount(10.0);
+            crudService.save(book);
+        });
+        UIMessages.showMessage(selected.size() + " book(s) updated.", MessageType.SUCCESS);
+    }
+}
+```
+
+## Long-running actions
+
+For operations that iterate over many records (reindexing, imports, recalculations), block the
+UI thread as little as possible and give the user progress feedback with
+`LongOperationMonitorWindow`. It runs the callback off the request thread and exposes an
+`increment()`/`isStopped()` API so the user can cancel:
+
+```java
+//mybookstore/actions/ReindexBooksAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.zk.ui.LongOperationMonitorWindow;
+
+import java.util.List;
+
+@InstallAction
+public class ReindexBooksAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public ReindexBooksAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("ReindexBooksAction");
+        setName("Reindex Books");
+        setApplicableClass(Book.class);
+        setImage("refresh");
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        LongOperationMonitorWindow.start("Reindexing books...", "Done", monitor -> {
+            List<Book> books = crudService.findAll(Book.class);
+            monitor.setMax(books.size());
+
+            for (Book book : books) {
+                monitor.setMessage("Processing: " + book.getTitle());
+                reindex(book);
+                monitor.increment();
+
+                if (monitor.isStopped()) {
+                    throw new ValidationError("Reindex cancelled by user.");
+                }
+            }
+        });
+    }
+
+    private void reindex(Book book) {
+        // your reindexing logic
+    }
+}
+```
+
+## Conditional visibility and enablement
+
+`Action` exposes `isEnabled()` and `isVisible()` (both no-argument). Override them for
+conditions that apply to the action as a whole — feature flags, licensing, or the current
+user's role — evaluated when the action is rendered:
+
+```java
+@Override
+public boolean isVisible() {
+    return securityService.hasRole("MANAGER");
+}
+
+@Override
+public boolean isEnabled() {
+    return featureFlags.isEnabled("bulk-discounts");
+}
+```
+
+For conditions that depend on the **specific row or entity** (a status, a field value), check
+inside `actionPerformed` itself and bail out early with a `UIMessages.showMessage(...,
+MessageType.WARNING)` — this is the pattern used by `MarkOutOfStockAction` above, and it keeps
+the enable/disable rule colocated with the logic that depends on it, instead of duplicating the
+condition in two places.
+
+## Controlling standard actions from YAML
+
+The framework's built-in CRUD actions (`NewAction`, `EditAction`, `DeleteAction`,
+`FindAction`, `ExportAction`, ...) and your own custom actions can be toggled per view without
+touching Java, from the `actions` section of a [view descriptor](/view-descriptors):
+
+```yaml
+# BookCrud.yml
+actions:
+  DeleteAction:
+    enabled: false          # hide/disable the built-in delete button
+
+  ReindexBooksAction:       # reference your custom action by its `name`
+    enabled: true
+```
 
 ## Recommendations
 
-- Use stable action names (`setName`) to reference them from YAML.
-- Move business logic to Spring services and invoke them from the action.
-- Avoid overly large actions; split by responsibility.
-- Add context validations when the action depends on a selected row or entity.
+<CardGrid>
+    <Card title="Stable names" icon="pencil">
+        Use consistent `setId`/`setName` values — they're how YAML descriptors and other code
+        reference the action.
+    </Card>
+    <Card title="Thin actions" icon="approve-check">
+        Push business logic into a Spring `@Service`. The action should orchestrate, not
+        implement.
+    </Card>
+    <Card title="Fail loud, fail early" icon="warning">
+        Validate the selection/context first and return with a clear `UIMessages` warning
+        instead of throwing deep in the logic.
+    </Card>
+    <Card title="One responsibility" icon="setting">
+        Split large "do everything" actions into smaller ones — it keeps `isVisible`/`isEnabled`
+        rules simple and each action independently testable.
+    </Card>
+</CardGrid>
+
+## Related
+
+- [View Descriptors](/view-descriptors) — control action availability per view with the `actions` section.
+- [Crud Service](/guides/crud-service) — the persistence API most actions delegate to.
+- [Crud Listeners](/guides/crud-listeners) — for logic that must run on every create/update/delete regardless of which action triggered it.

@@ -66,7 +66,14 @@ fully functional HTML template called Dynamical. Later will customize this page
 
 ![First time running DynamiaTools](../../assets/getting-started/first-run.png)
 
+### Two ways to enable DynamiaTools
 
+DynamiaTools can be turned on in a Spring Boot app in two ways:
+
+- **Classic — `@EnableDynamiaTools` annotation.** Add the annotation to your `@SpringBootApplication` class together with the `tools.dynamia.app` dependency. This is explicit and gives you fine-grained control when you compose individual modules yourself (see the [Custom Setup](/custom-setup) guide).
+- **Newer — `zk-starter` auto-configuration.** The `platform/starters/zk-starter` module (artifact `dynamia-tools-zk-starter`) ships `DynamiaToolsAutoConfiguration` and an `AutoInitViewDescriptors` runner that are picked up automatically by Spring Boot's auto-configuration mechanism. No annotation needed — just add the starter dependency (as in step 3 above) and DynamiaTools, ZK UI, and view descriptor loading are configured for you.
+
+Both paths end up in the same place, so pick whichever fits your project: the annotation for explicit, hand-composed setups, the starter for a zero-effort, annotation-free start. Either way, once your app is running you can pick a template/skin — see [Themes](/ecosystem/themes).
 
 
 

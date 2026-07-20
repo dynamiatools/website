@@ -1,7 +1,7 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-export const dynamiaToolsVersion = '26.4.0'
+export const dynamiaToolsVersion = '26.7.0'
 
 
 // https://astro.build/config
@@ -20,13 +20,13 @@ export default defineConfig({
                 dark: './src/assets/dynamia-tools-dark.svg',
                 replacesTitle: true,
             },
-            favicon: '/images/favicon.png',
+            favicon: '/favicon.png',
             head: [
                 {
                     tag: 'link',
                     attrs: {
                         rel: 'icon',
-                        href: '/images/favicon.png',
+                        href: '/favicon.png',
                         sizes: '32x32',
                     },
                 },
@@ -75,6 +75,15 @@ export default defineConfig({
                     autogenerate: {directory: 'extensions'},
                 },
                 {
+                    label: 'Reference',
+                    translations: {
+                        es: 'Referencia',
+                    },
+                    items: [
+                        'reference/quick-reference'
+                    ]
+                },
+                {
                     label: 'Ecosystem',
                     translations: {
                         es: 'Ecosistema',
@@ -84,6 +93,16 @@ export default defineConfig({
                             label: 'Buckie — File Server',
                             translations: { es: 'Buckie — Servidor de Archivos' },
                             link: 'buckie/',
+                        },
+                        {
+                            label: 'CLI',
+                            translations: { es: 'CLI' },
+                            link: 'ecosystem/cli',
+                        },
+                        {
+                            label: 'Templates & Themes',
+                            translations: { es: 'Plantillas y Temas' },
+                            link: 'ecosystem/themes',
                         }
                     ]
                 },

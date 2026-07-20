@@ -1,18 +1,20 @@
 ---
 title: Email & SMS
-description: Async email and SMS services for Dynamia Platform
+description: Async email, SMS and OTP delivery for Dynamia Platform
 ---
 
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Email & SMS provides asynchronous messaging capabilities in Dynamia applications.
+Email & SMS provides asynchronous messaging capabilities in Dynamia applications, backed by JavaMail (email) and AWS SNS (SMS). It installs an `Email` module with CRUDs for accounts, templates, and delivery logs.
 
 It includes:
 
-- email accounts and templates,
-- SMS sending support,
-- message logs and management UI.
+- multiple email/SMS **accounts**, with one marked as *preferred* per tenant,
+- reusable **templates** (`EmailTemplate`) that can also trigger an SMS,
+- **OTP** delivery (`OTPService`) over email, SMS, or both,
+- delivery logs (`EmailMessageLog`, `SMSMessageLog`) and address tracking (`EmailAddress`).
 
 ## Maven
 
@@ -43,15 +45,18 @@ No dedicated Node package is currently published for this extension.
 
 Frontend apps usually interact through backend APIs and actions exposed by your Dynamia application.
 
-## Java usage example
+## Sending a simple email
+
+`EmailService.send(...)` is asynchronous and returns a `CompletableFuture<EmailSendResult>`. A synchronous variant, `sendAndWait(...)`, is available when you need the result immediately (e.g. inside a batch job).
 
 ```java
+//NotificationService.java
+package myapp.notifications;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import tools.dynamia.modules.email.domain.EmailMessage;
+import tools.dynamia.modules.email.EmailMessage;
 import tools.dynamia.modules.email.services.EmailService;
-import tools.dynamia.modules.email.sms.SMSMessage;
-import tools.dynamia.modules.email.sms.SMSService;
 
 @Service
 public class NotificationService {
@@ -59,16 +64,167 @@ public class NotificationService {
     @Autowired
     private EmailService emailService;
 
-    @Autowired
-    private SMSService smsService;
-
-    public void sendNotification(String emailTo, String mobile, String message) {
-        var email = new EmailMessage(emailTo, "Notification", message);
-        var sms = new SMSMessage(mobile, message);
-
-        emailService.send(email);
-        smsService.send(sms);
+    public void sendWelcomeEmail(String to, String name) {
+        var message = new EmailMessage(to, "Welcome to the platform", "Hi " + name + ", thanks for joining!");
+        emailService.send(message); // fire-and-forget, returns CompletableFuture<EmailSendResult>
     }
 }
 ```
 
+<Aside type="tip">
+  `EmailService` and `SMSService` resolve the *preferred* `EmailAccount` automatically when none is set on the message. Override it explicitly by calling `message.setMailAccount(account)`.
+</Aside>
+
+## Templated email
+
+`EmailTemplate` stores subject/body/recipients and an optional linked SMS (`sendSMS`, `smsNumber`, `smsText`). Build an `EmailMessage` directly from a template and pass a model map for placeholder substitution.
+
+```java
+//TemplatedEmailService.java
+package myapp.notifications;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import tools.dynamia.modules.email.EmailMessage;
+import tools.dynamia.modules.email.domain.EmailTemplate;
+import tools.dynamia.modules.email.services.EmailService;
+
+import java.util.Map;
+
+@Service
+public class TemplatedEmailService {
+
+    @Autowired
+    private EmailService emailService;
+
+    public void sendInvoiceEmail(String to, String invoiceNumber, String total) {
+        EmailTemplate template = emailService.getTemplateByName("invoice-notification", true);
+
+        var message = new EmailMessage(template);
+        message.setTo(to);
+        message.setTemplateModel(Map.of(
+                "invoiceNumber", invoiceNumber,
+                "total", total
+        ));
+
+        emailService.send(message);
+    }
+}
+```
+
+<Aside type="note">
+  If the `EmailTemplate` used by a message has `sendSMS` enabled, sending the email also triggers the associated SMS automatically (`AutoSendSMSFromEmailServiceListener`) — no extra code required.
+</Aside>
+
+## Sending SMS
+
+```java
+//SmsNotificationService.java
+package myapp.notifications;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import tools.dynamia.modules.email.SMSMessage;
+import tools.dynamia.modules.email.services.SMSService;
+
+@Service
+public class SmsNotificationService {
+
+    @Autowired
+    private SMSService smsService;
+
+    public void sendActivationCode(String mobile, String code) {
+        var sms = new SMSMessage(mobile, "Your activation code is: " + code);
+        smsService.send(sms); // returns provider response / message id
+    }
+}
+```
+
+## One-Time Passwords (OTP)
+
+For login/verification flows, `OTPService` sends an `OTPMessage` over email, SMS, or both depending on which fields you populate — useful for 2FA without hand-rolling delivery logic.
+
+```java
+//OtpService.java
+package myapp.auth;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import tools.dynamia.modules.email.OTPMessage;
+import tools.dynamia.modules.email.services.OTPService;
+
+@Service
+public class OtpService {
+
+    @Autowired
+    private OTPService otpService;
+
+    public void sendLoginCode(String email, String mobile, String code) {
+        var otp = new OTPMessage();
+        otp.setOtp(code);
+        otp.setTargetEmail(email);
+        otp.setTargetPhoneNumber(mobile);
+        otp.setSendEmail(true);
+        otp.setSendSMS(true);
+
+        otpService.send(otp); // CompletableFuture<OTPSendResult>
+    }
+}
+```
+
+## Account configuration
+
+`EmailAccount` holds SMTP credentials plus optional AWS SNS credentials for SMS on the same record (`smsEnabled`, `smsUsername`, `smsRegion`, ...). Create it through the CRUD UI, or programmatically for bootstrap/seed data:
+
+```java
+//EmailAccountSeeder.java
+package myapp.config;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.integration.sterotypes.Component;
+import tools.dynamia.modules.email.domain.EmailAccount;
+
+@Component
+public class EmailAccountSeeder {
+
+    @Autowired
+    private CrudService crudService;
+
+    public void createDefaultAccount() {
+        var account = new EmailAccount();
+        account.setName("Default");
+        account.setFromAddress("noreply@example.com");
+        account.setServerAddress("smtp.gmail.com");
+        account.setPort(587);
+        account.setUsername("your-email@gmail.com");
+        account.setPassword("your-app-password");
+        account.setUseTTLS(true);
+        account.setLoginRequired(true);
+        account.setPreferred(true);
+
+        crudService.save(account);
+    }
+}
+```
+
+<CardGrid>
+  <Card title="EmailService" icon="email">
+    `send()` / `sendAndWait()`, preferred account resolution, template lookup, address logging.
+  </Card>
+  <Card title="SMSService" icon="approve-check">
+    Single `send(SMSMessage)` method; provider is AWS SNS by default.
+  </Card>
+  <Card title="OTPService" icon="seti:lock">
+    Multi-channel one-time password delivery for 2FA/verification flows.
+  </Card>
+  <Card title="EmailAccount / EmailTemplate" icon="setting">
+    Persisted configuration entities, manageable from the Email module's CRUD UI.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Quick Reference](/reference/quick-reference)
+- [Entities Guide](/guides/entities)
+- [SaaS Extension](/extensions/saas) — accounts here are tenant-aware via `SimpleEntitySaaS`

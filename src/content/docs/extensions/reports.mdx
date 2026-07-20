@@ -1,14 +1,21 @@
 ---
 title: Reports
-description: Define and run reports, filters, exports, and report APIs
+description: Define and run ad-hoc reports with filters, exports, charts, and a public REST API
 ---
 
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Reports provides an in-app reporting module where users can run query-based reports, apply filters, and export results (CSV, Excel, PDF).
+Reports (DynamiaReports) is an in-app reporting module: report definitions — JPQL or native SQL, filters, columns, charts — are stored **in the database** as regular entities, so business users can create/edit/copy reports from the CRUD UI without a deploy. It includes API, core, and UI modules, plus a public REST endpoint per report.
 
-It includes API, core, and UI modules.
+Key capabilities:
+
+- query builder using JPQL or native SQL, against the app's own datasource or an external one,
+- typed **filters** with defaults, enum/entity-backed option lists,
+- export to CSV, Excel, and PDF,
+- chart visualization (`ReportChart`) rendered from report data,
+- reports embeddable in other apps and exposable as a versioned REST endpoint.
 
 ## Maven
 
@@ -59,9 +66,97 @@ const data = await reports.post('sales', 'monthly', {
 });
 ```
 
-## Java usage example
+## The `Report` entity
+
+`Report` (table `rpt_reports`) is itself a JPA entity (`SimpleEntitySaaS`, tenant-aware). Most teams create/edit reports through the UI module's CRUD, but you can also seed them programmatically:
 
 ```java
+//SalesReportSeeder.java
+package myapp.reports;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.integration.sterotypes.Component;
+import tools.dynamia.modules.reports.core.domain.Report;
+import tools.dynamia.modules.reports.core.domain.ReportField;
+import tools.dynamia.modules.reports.core.domain.ReportFilter;
+import tools.dynamia.modules.reports.core.domain.ReportGroup;
+import tools.dynamia.modules.reports.core.domain.enums.DataType;
+
+@Component
+public class SalesReportSeeder {
+
+    @Autowired
+    private CrudService crudService;
+
+    public void seed(ReportGroup salesGroup) {
+        var report = new Report();
+        report.setGroup(salesGroup);
+        report.setName("monthly");
+        report.setTitle("Monthly Sales");
+        report.setQueryLang("jpql");
+        report.setQueryScript("select c from Contact c where year(c.creationDate) = :year order by c.name");
+        report.setAutofields(true);
+        report.setActive(true);
+        report.setExportEndpoint(true);      // exposes it at /api/reports/{group}/{endpoint}
+        report.setEndpointName("monthly");
+
+        var yearFilter = new ReportFilter("year");
+        yearFilter.setLabel("Year");
+        yearFilter.setDataType(DataType.NUMBER);
+        yearFilter.setRequired(true);
+        yearFilter.setReport(report);
+        report.getFilters().add(yearFilter);
+
+        var nameField = new ReportField();
+        nameField.setName("name");
+        nameField.setLabel("Name");
+        nameField.setReport(report);
+        report.getFields().add(nameField);
+
+        crudService.save(report);
+    }
+}
+```
+
+## Running a report from Java
+
+```java
+//ReportRunnerService.java
+package myapp.reports;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import tools.dynamia.integration.sterotypes.Service;
+import tools.dynamia.modules.reports.core.ReportData;
+import tools.dynamia.modules.reports.core.ReportFilters;
+import tools.dynamia.modules.reports.core.domain.Report;
+import tools.dynamia.modules.reports.core.services.ReportsService;
+
+@Service
+public class ReportRunnerService {
+
+    @Autowired
+    private ReportsService reportsService;
+
+    public ReportData runMonthlySales(int year) {
+        Report report = reportsService.findByEndpoint("sales", "monthly");
+
+        var filters = new ReportFilters();
+        filters.add(report.getFilters().get(0), year);
+
+        return reportsService.execute(report, filters, null); // null = use app's default datasource
+    }
+}
+```
+
+## Public REST endpoint
+
+Any report with `exportEndpoint = true` is automatically exposed. Filters are passed as query params on `GET`, or as a `ReportFilters` JSON body on `POST`:
+
+```java
+//ReportApiClientExample.java
+package myapp.reports;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -79,3 +174,28 @@ HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofS
 System.out.println(response.body());
 ```
 
+`GET /api/reports` lists every exportable `Report` as a `ReportDTO`; `GET|POST /api/reports/{group}/{endpoint}` runs one, applying request parameters (or a `ReportFilters` body) as filter values.
+
+<Aside type="note">
+  Export formats (CSV, Excel, PDF) and chart rendering are handled by the UI module's exporters (`ExcelReportDataExporter`, and friends). Email delivery of scheduled reports is on the module's feature list — check the version you're targeting if you rely on it, since it evolves alongside the UI module.
+</Aside>
+
+<CardGrid>
+  <Card title="Report / ReportGroup" icon="document">
+    Persisted report definition: query, fields, filters, charts, endpoint exposure.
+  </Card>
+  <Card title="ReportsService" icon="setting">
+    `execute()`, `loadReportModel()`, `findByEndpoint()`, `exportReport()` / `importReport()`.
+  </Card>
+  <Card title="ReportFilters" icon="magnifier">
+    Runtime filter values bound to a report's `ReportFilter` definitions.
+  </Card>
+  <Card title="ReportChart" icon="seti:graphql">
+    Declarative chart definition (`labelField`, `valueField`, `type`) rendered from `ReportData`.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Quick Reference](/reference/quick-reference)
+- [Dashboard Extension](/extensions/dashboard) — chart widgets can consume report data too

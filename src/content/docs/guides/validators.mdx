@@ -1,0 +1,169 @@
+---
+title: Validators
+description: Business-rule validation with Validator<T> and @InstallValidator — field-level and cross-entity checks that run before persistence, and why they don't belong in @PrePersist.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Bean Validation annotations (`@NotNull`, `@Size`, `@Pattern`, ...) cover shape — is this field
+present, how long, what format. `Validator<T>` covers everything Bean Validation can't express on
+its own: uniqueness checks against the database, cross-field rules, conditional logic based on
+entity state, or anything that needs a collaborator like `CrudService`.
+
+## The `Validator<T>` contract
+
+```java
+package tools.dynamia.domain;
+
+public interface Validator<T> {
+    void validate(T t) throws ValidationError;
+}
+```
+
+One method. It either returns normally (the object is valid) or throws `ValidationError` — there
+is no list of errors to build and return; each failing rule throws immediately with a message
+describing what's wrong. `ValidationError` extends `jakarta.validation.ValidationException` and
+has a few constructors worth knowing:
+
+```java
+throw new ValidationError("Email is required");
+
+throw new ValidationError("Ship date must be after %s", order.getOrderDate());
+
+throw new ValidationError("Price cannot be negative", product.getPrice(), "price", Product.class);
+//                          message                     invalidValue     property   entityClass
+```
+
+The four-argument form is what lets the UI highlight the specific field (`"price"`) instead of
+just showing a generic banner.
+
+## Registering a validator: `@InstallValidator`
+
+`@InstallValidator` (`tools.dynamia.domain.InstallValidator`) marks the class as a
+prototype-scoped Spring bean. The framework discovers every `Validator` in the context and runs
+the applicable ones — matched by their generic type parameter — before `CrudService.create()`,
+`update()`, and `save()`.
+
+```java
+//mybookstore/validators/BookValidator.java
+package mybookstore.validators;
+
+import mybookstore.domain.Book;
+import tools.dynamia.domain.InstallValidator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.Validator;
+
+import java.math.BigDecimal;
+
+@InstallValidator
+public class BookValidator implements Validator<Book> {
+
+    @Override
+    public void validate(Book book) throws ValidationError {
+        if (book.getTitle() == null || book.getTitle().isBlank()) {
+            throw new ValidationError("Title is required", null, "title", Book.class);
+        }
+
+        if (book.getPrice() != null && book.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationError("Price must be zero or positive", book.getPrice(), "price", Book.class);
+        }
+
+        if (book.isOnSale() && book.getSalePrice() == null) {
+            throw new ValidationError("Sale price is required when the book is on sale",
+                    null, "salePrice", Book.class);
+        }
+    }
+}
+```
+
+## Cross-entity validation (uniqueness, database rules)
+
+Constructor-inject `CrudService` for rules that need to query the database — a uniqueness check
+is the textbook case:
+
+```java
+//mybookstore/validators/InvoiceValidator.java
+package mybookstore.validators;
+
+import mybookstore.domain.Invoice;
+import tools.dynamia.domain.InstallValidator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.Validator;
+import tools.dynamia.domain.services.CrudService;
+
+@InstallValidator
+public class InvoiceValidator implements Validator<Invoice> {
+
+    private final CrudService crudService;
+
+    public InvoiceValidator(CrudService crudService) {
+        this.crudService = crudService;
+    }
+
+    @Override
+    public void validate(Invoice invoice) throws ValidationError {
+        if (invoice.getDetails() == null || invoice.getDetails().isEmpty()) {
+            throw new ValidationError("Invoice must have at least one line", null, "details", Invoice.class);
+        }
+
+        if (invoice.getNumber() != null && invoice.isNew()) {
+            long count = crudService.count(Invoice.class, "number", invoice.getNumber());
+            if (count > 0) {
+                throw new ValidationError("Invoice number already exists", invoice.getNumber(), "number", Invoice.class);
+            }
+        }
+    }
+}
+```
+
+<Aside type="tip">
+Validators are stateless singletons (well, prototype-scoped, but treat them as stateless) — never
+mutate the entity inside `validate()`. If you need to derive/normalize a value before saving, that
+belongs in a [`CrudServiceListener`](/guides/crud-listeners) or a `@Service`, not here.
+</Aside>
+
+## Why not `@PrePersist`/`@PreUpdate`?
+
+It's tempting to put a check directly on the entity:
+
+```java
+// Don't do this
+@PrePersist
+public void validate() {
+    if (email == null) {
+        throw new RuntimeException("Email is required");
+    }
+}
+```
+
+Three concrete problems with this:
+
+1. **It fires mid-flush, inside the transaction.** By the time Hibernate calls `@PrePersist`,
+   you're deep in `EntityManager` internals — the exception you throw has to unwind through JPA's
+   machinery instead of being caught cleanly at the point `CrudService.save()` was called.
+2. **No structured, field-addressable error.** A `RuntimeException` (or even a `ValidationError`
+   thrown here) doesn't give the UI a `(property, value)` pair to highlight — you lose the
+   per-field feedback `ValidationError`'s four-argument constructor gives you in a `Validator`.
+3. **Entities can't be constructor-injected**, so any rule that needs `CrudService` or another
+   bean is simply unreachable from a lifecycle callback without resorting to static
+   service-locator hacks — which is its own anti-pattern.
+
+`Validator<T>` runs at the right layer (the `CrudService` boundary), with the right tooling
+(dependency injection, structured errors) for exactly this job.
+
+<CardGrid>
+  <Card title="Field-level" icon="pencil">
+    Presence, format, and simple ranges — usually cheaper as Bean Validation annotations
+    (`@NotNull`, `@Pattern`) directly on the entity, unless the message needs to be dynamic.
+  </Card>
+  <Card title="Cross-entity" icon="magnifier">
+    Uniqueness, referential rules, anything needing `CrudService` — always a `Validator<T>`.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Entities](/guides/entities) — why lifecycle callbacks aren't the place for business rules.
+- [CrudServiceListener](/guides/crud-listeners) — for derived values/side effects, as opposed to rejecting invalid data.
+- [Development Patterns](/guides/development-patterns) — the validator pattern in the broader best-practices context.
+- [Quick Reference](/reference/quick-reference) — condensed validator cheat-sheet.

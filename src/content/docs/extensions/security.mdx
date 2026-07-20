@@ -1,19 +1,20 @@
 ---
 title: Security
-description: Users, profiles, tokens, and access control on top of Spring Security
+description: Users, profiles, permissions, access tokens, JWT and Spring Security integration
 ---
 
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Security adds user/profile management and access control features to Dynamia applications.
+Security adds user/profile management and access control on top of **Spring Security**. It installs a `Security` module with CRUDs for users, profiles, and permissions, plus services for authentication, token issuance, and permission checks.
 
-It is built on top of Spring Security and includes:
+It includes:
 
-- users and profile management,
-- token support,
-- role/permission-based restrictions,
-- optional UI module for admin features.
+- `User` / `Profile` / `Permission` domain model, with tenant-aware permissions (`AccountAware`),
+- `UserAccessToken` for long-lived API tokens (in addition to session login),
+- a minimal `JWTService` for issuing/validating JWTs,
+- Spring Security filter chain integration — form login, method security, OAuth2/OIDC.
 
 ## Maven
 
@@ -38,27 +39,239 @@ implementation 'tools.dynamia.modules:tools.dynamia.modules.security:VERSION'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.security.ui:VERSION'
 ```
 
+<Aside type="caution" title="Artifact id — verify against your version">
+  The extension's own `README.md` shows the Maven coordinate as `tools.dynamia.modules.security.core`, but the module's actual `sources/core/pom.xml` builds artifact `tools.dynamia.modules.security` (no `.core` suffix) — that's the id used above and it's the one that matches Maven Central. Treat the README as outdated on this point.
+</Aside>
+
 ## Frontend package
 
 No dedicated Node package is currently published for this extension.
 
 Frontend apps consume security-enabled endpoints and authentication flows through `@dynamia-tools/sdk`.
 
-## Java usage example
+## Domain model
+
+| Type | Purpose |
+|---|---|
+| `User` | `username`, `password`, `enabled`, `accountNonLocked`, `fullname`, `email`, `profiles` (`List<UserProfile>`), tenant `accountId` |
+| `Profile` | Named role — `name`, `internalName`, `permissions` (`List<Permission>`); implements `GrantedAuthority` |
+| `Permission` | `type` + `value` pair scoped to a `Profile`, e.g. `("contacts", "DELETE")` |
+| `UserAccessToken` | Long-lived API token tied to a `User`, with `expirationDate`, `hits`, `lastAccess` |
 
 ```java
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.security.access.prepost.PreAuthorize;
+//SeedAdminUser.java
+package myapp.security;
 
-@RestController
-public class AdminController {
+import org.springframework.beans.factory.annotation.Autowired;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.integration.sterotypes.Component;
+import tools.dynamia.modules.security.domain.Permission;
+import tools.dynamia.modules.security.domain.Profile;
+import tools.dynamia.modules.security.domain.User;
+import tools.dynamia.modules.security.domain.UserProfile;
 
-    @GetMapping("/api/admin/health")
-    @PreAuthorize("hasRole('ADMIN')")
-    public String health() {
-        return "ok";
+@Component
+public class SeedAdminUser {
+
+    @Autowired
+    private CrudService crudService;
+
+    public void run() {
+        var adminProfile = new Profile();
+        adminProfile.setName("ADMIN");
+        adminProfile.addPermission(new Permission("contacts", "READ"));
+        adminProfile.addPermission(new Permission("contacts", "DELETE"));
+        adminProfile.addPermission(new Permission("system", "MANAGE"));
+        crudService.save(adminProfile);
+
+        var admin = new User("admin");
+        admin.setFullname("System Administrator");
+        admin.setEmail("admin@example.com");
+        admin.getProfiles().add(new UserProfile(adminProfile, admin));
+
+        crudService.save(admin);
     }
 }
 ```
 
+## Authenticating and issuing tokens
+
+`SecurityService` (a Spring `UserDetailsService`) handles login, password rules, and API tokens; `JWTService` is a small helper to mint/verify JWTs for stateless clients.
+
+```java
+//AuthController.java
+package myapp.security;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import tools.dynamia.modules.security.services.JWTService;
+import tools.dynamia.modules.security.services.SecurityService;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+public class AuthController {
+
+    @Autowired
+    private SecurityService securityService;
+
+    @Autowired
+    private JWTService jwtService;
+
+    @PostMapping("/api/auth/login")
+    public String login(@RequestParam String username, @RequestParam String password) {
+        // SecurityService#loadUserByUsername + Spring's PasswordEncoder handle verification
+        var user = securityService.loadUserByUsername(username);
+
+        return jwtService.generateToken(
+                user.getUsername(),
+                List.of("ROLE_USER"),
+                Map.of("email", user.getEmail()),
+                Duration.ofHours(8)
+        );
+    }
+}
+```
+
+## Securing methods and endpoints
+
+Use standard Spring Security method annotations — `Profile` implements `GrantedAuthority`, so role checks work out of the box:
+
+```java
+//ContactService.java
+package myapp.contacts;
+
+import org.springframework.security.access.prepost.PreAuthorize;
+import tools.dynamia.integration.sterotypes.Service;
+
+@Service
+public class ContactService {
+
+    @PreAuthorize("hasRole('ADMIN')")
+    public void deleteContact(Long id) {
+        // only ADMIN profile can delete
+    }
+
+    @PreAuthorize("hasPermission('contacts', 'READ')")
+    public java.util.List<Contact> getAllContacts() {
+        // requires the 'contacts'/'READ' permission
+        return java.util.List.of();
+    }
+}
+```
+
+## Spring Security wiring
+
+DynamiaTools integrates with Spring Security's standard `SecurityFilterChain` — a basic form-login setup:
+
+```java
+//SecurityConfig.java
+package myapp.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                .loginPage("/login")
+                .defaultSuccessUrl("/")
+                .permitAll()
+            )
+            .logout(logout -> logout
+                .logoutSuccessUrl("/login?logout")
+                .permitAll()
+            );
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+```
+
+### OAuth2 / OIDC integration
+
+For external identity providers (Google, Azure AD, Okta, Keycloak...), enable `oauth2Login` and/or `oauth2ResourceServer`:
+
+```java
+//OAuth2SecurityConfig.java
+package myapp.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.web.SecurityFilterChain;
+
+@Configuration
+@EnableWebSecurity
+public class OAuth2SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .oauth2Login(oauth2 -> oauth2
+                .defaultSuccessUrl("/")
+                .failureUrl("/login?error")
+            )
+            .oauth2ResourceServer(rs -> rs.jwt());
+        return http.build();
+    }
+}
+```
+
+```yaml
+# application.yml
+spring:
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid, profile, email
+```
+
+<CardGrid>
+  <Card title="SecurityService" icon="seti:lock">
+    `UserDetailsService` + `createUser`, `resetPassword`, `requestToken`, `findAccessToken`.
+  </Card>
+  <Card title="ProfileService" icon="setting">
+    Profile/permission management — `getPermissions`, `getAdminProfile`, `getUsersByProfile`.
+  </Card>
+  <Card title="JWTService" icon="approve-check">
+    Minimal JWT issuance/validation — `generateToken`, `extractUsername`, `extractRoles`, `extractClaim`.
+  </Card>
+  <Card title="CurrentUser" icon="user">
+    Session-scoped bean exposing the authenticated `User` and its permissions to the UI layer.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [Quick Reference](/reference/quick-reference)
+- [SaaS Extension](/extensions/saas) — `User`/`Profile`/`Permission` are tenant-aware via `accountId`
+- [Actions Guide](/guides/actions)

@@ -1,0 +1,127 @@
+---
+title: Templates & Themes
+description: How Dynamia Platform's pluggable UI shell works, and theme-dynamical — the Bootstrap 5 / AdminLTE reference theme with 10 skins.
+---
+
+import { Card, CardGrid, Aside, LinkButton } from '@astrojs/starlight/components';
+
+Every screen DynamiaTools auto-generates from a [view descriptor](/view-descriptors) — forms, tables, the navigation bar, the login screen — is rendered inside a **template**: a Maven/Gradle dependency that supplies the HTML shell, CSS and ZK components around your content. Swapping the template changes how the whole application looks without touching a single view descriptor or entity.
+
+<Aside type="note" title="One theme today">
+  The template system is pluggable by design, but **`theme-dynamical` is currently the only theme Dynamia Platform ships**. There isn't a gallery of alternate themes to pick from yet — think of this page as documenting the reference implementation, not choosing between options.
+</Aside>
+
+## How template selection works
+
+A template is selected with two Spring Boot properties under the `dynamia.app` prefix — the same properties group the [Getting Started guide](/getting-started) uses for `name`, `default-logo` and friends:
+
+```yaml
+# application.yml
+dynamia:
+  app:
+    template: Dynamical
+    default-skin: Blue
+```
+
+- **`dynamia.app.template`** — the name of the installed template bean (`Dynamical` for `theme-dynamical`)
+- **`dynamia.app.default-skin`** — which color skin the template renders by default
+
+Nothing else in your application changes: entities, `ModuleProvider`s and view descriptors are template-agnostic. The template only owns layout, CSS and the chrome around your pages.
+
+## theme-dynamical
+
+`theme-dynamical` is the reference (and, for now, only) Dynamia Platform template. It's built on top of [AdminLTE](https://adminlte.io/) — a free, MIT-licensed admin dashboard template — running on **Bootstrap 5** and optimized specifically for **ZK 10.x**.
+
+<CardGrid>
+  <Card title="10 skins" icon="star">
+    Blue, Dynamia, Red, Orange, Purple, Green, DarkOrange, Yellow, Olive, Black — switch with one property, no rebuild.
+  </Card>
+  <Card title="Login & profile UI" icon="approve-check-circle">
+    Ships ready-made login and user-profile screens instead of leaving you to build them.
+  </Card>
+  <Card title="Multi-tab UI" icon="list-format">
+    Opens pages in tabs inside the shell, so users can work across multiple entities without losing context.
+  </Card>
+  <Card title="Fully responsive" icon="laptop">
+    Adapts from small mobile devices to large desktops — the same descriptors render correctly at every size.
+  </Card>
+</CardGrid>
+
+It also supports a custom app logo and icon (the `dynamia.app.default-logo` / `dynamia.app.default-icon` properties from the Getting Started guide), and is kept intentionally compact.
+
+### Install
+
+**Maven**
+
+```xml
+<dependency>
+  <groupId>tools.dynamia.themes</groupId>
+  <artifactId>tools.dynamia.themes.dynamical</artifactId>
+  <version>5.4.0</version>
+</dependency>
+```
+
+**Gradle**
+
+```groovy
+compile 'tools.dynamia.themes:tools.dynamia.themes.dynamical:5.4.0'
+```
+
+<Aside type="tip">
+  Projects generated with the <a href="/ecosystem/cli">CLI</a> (`dynamia new`) already include `theme-dynamical` on the classpath — you only need to add this dependency manually if you started from a plain Spring Initializr project, per the <a href="/getting-started">Getting Started</a> guide.
+</Aside>
+
+### Configure
+
+```yaml
+# application.yml
+dynamia:
+  app:
+    template: Dynamical
+    default-skin: Blue
+```
+
+Or in `application.properties`:
+
+```properties
+dynamia.app.template=Dynamical
+dynamia.app.default-skin=Blue
+```
+
+### Available skins
+
+Set `default-skin` to any of:
+
+- Blue
+- Dynamia
+- Red
+- Orange
+- Purple
+- Green
+- DarkOrange
+- Yellow
+- Olive
+- Black
+
+Changing the skin is a config-only change — no CSS to write, no rebuild of the template itself.
+
+## Where to next
+
+<CardGrid>
+  <Card title="Getting Started" icon="rocket">
+    See the Dynamical template running on a freshly generated project, including the responsive and custom-branding walkthrough.
+    <LinkButton href="/getting-started" variant="minimal">Getting Started →</LinkButton>
+  </Card>
+  <Card title="CLI" icon="seti:powershell">
+    Scaffold a new backend that already has theme-dynamical wired in, via the dynamia new wizard.
+    <LinkButton href="/ecosystem/cli" variant="minimal">CLI →</LinkButton>
+  </Card>
+  <Card title="Quick Reference" icon="document">
+    Cheat-sheet for the properties, stereotypes and descriptor syntax you'll use alongside a theme.
+    <LinkButton href="/reference/quick-reference" variant="minimal">Quick Reference →</LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+Source: [github.com/dynamiatools/theme-dynamical](https://github.com/dynamiatools/theme-dynamical) · License Apache 2.0

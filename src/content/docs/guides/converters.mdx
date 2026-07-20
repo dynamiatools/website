@@ -1,0 +1,179 @@
+---
+title: Converters
+description: Formatting values in tables and forms with the built-in converters.* library, writing a custom converter, and wiring it from a view descriptor's params.converter.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+[View descriptors](/view-descriptors) let a `table`/`entityfilters`/`export` field declare
+`params.converter: converters.Currency` to control how a raw value is rendered. That short
+`converters.X` name resolves to a class in `tools.dynamia.zk.converters` — this guide covers the
+built-ins, how to write your own, and how the resolution actually works so a custom converter
+doesn't silently fail to load.
+
+<Aside type="note">
+Dynamia Platform has **two** distinct converter concepts that share a name but solve different
+problems. This guide is about the **view/binding converter** used by `params.converter` in YAML.
+The [second one](#the-other-converter-generic-typestring-conversion) is a lower-level
+string↔object bridge unrelated to rendering — covered at the end so the two don't get confused.
+</Aside>
+
+## Built-in converters
+
+These live in `tools.dynamia.zk.converters` and are referenced by their short name:
+
+| Converter | Description |
+|---|---|
+| `converters.Currency` | Currency format with symbol, using the request locale |
+| `converters.CurrencySimple` | Currency amount without the symbol |
+| `converters.Decimal` | Decimal number with thousands separators |
+| `converters.Percent` | Formats a numeric value as a percentage |
+| `converters.Date` | Date only, delegates to `LocalDate` |
+| `converters.DateTime` / `converters.LocalDateTime` | Date and time |
+| `converters.LocalTime` / `converters.LocalTime12` / `converters.Time` | Time-only formats |
+| `converters.Month` | Month name |
+| `converters.Duration` / `converters.Millis` | Elapsed-time formats |
+| `converters.LongDate` | Long-form date (`java.util.Date` millis) |
+| `converters.Integer` / `converters.Double` | Numeric coercion without formatting |
+| `converters.Mustache` | Renders a Mustache template against the row |
+
+```yaml
+# BookTable.yml
+fields:
+  price:
+    params:
+      converter: converters.Currency
+      header: { align: right }
+  publishDate:
+    params:
+      converter: converters.Date
+```
+
+## Writing a custom converter
+
+A view converter implements ZK's binding `Converter<UI_TYPE, BEAN_TYPE, Component>` — the same
+interface the built-ins use — with two methods: `coerceToUi` (bean value → what the component
+displays) and `coerceToBean` (component value → what gets written back to the entity).
+
+```java
+//mybookstore/converters/WeightConverter.java
+package mybookstore.converters;
+
+import org.zkoss.bind.BindContext;
+import org.zkoss.bind.Converter;
+import org.zkoss.zk.ui.Component;
+
+import java.math.BigDecimal;
+
+public class WeightConverter implements Converter<Object, Object, Component> {
+
+    @Override
+    public Object coerceToUi(Object beanValue, Component comp, BindContext ctx) {
+        if (beanValue instanceof BigDecimal grams) {
+            return grams.divide(BigDecimal.valueOf(1000)) + " kg";
+        }
+        return null;
+    }
+
+    @Override
+    public Object coerceToBean(Object uiValue, Component comp, BindContext ctx) {
+        if (uiValue instanceof String s) {
+            return new BigDecimal(s.replace(" kg", "")).multiply(BigDecimal.valueOf(1000));
+        }
+        return null;
+    }
+}
+```
+
+Wire it from the descriptor with the **fully qualified class name** — not the `converters.`
+shorthand:
+
+```yaml
+# BookTable.yml
+fields:
+  weightGrams:
+    label: Weight
+    params:
+      converter: mybookstore.converters.WeightConverter
+```
+
+<Aside type="caution">
+The `converters.` prefix isn't a generic package alias — the renderer rewrites it verbatim to
+`tools.dynamia.zk.converters.<name>` before instantiating the class. It only ever resolves inside
+that framework package. Your own converters must always be referenced by their full class name;
+no registration annotation is required, the same way [`ViewCustomizer`](/guides/view-customizers)
+classes are instantiated directly by name from YAML.
+</Aside>
+
+Converters are typically read-mostly (tables), so `coerceToBean` can be a no-op (`return null;`)
+if the field is never edited through this component — implement it fully only for converters used
+on writable/inline-editable fields or form inputs.
+
+## The "other" converter: generic type↔string conversion
+
+Separate from view rendering, `tools.dynamia.io.converters.Converter<T>` is a plain
+string-to-object bridge used internally for things like configuration values and data import/export:
+
+```java
+public interface Converter<T> {
+    Class<T> getTargetClass();
+    String toString(T value);
+    T toObject(String value);
+}
+```
+
+Built-ins (`DateConverter`, `BooleanConverter`, `BigDecimalConverter`, ...) register themselves
+as ordinary Spring beans with `@Provider`, and are looked up by target class through the
+`Converters` utility:
+
+```java
+//mybookstore/converters/WeightTextConverter.java
+package mybookstore.converters;
+
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.io.converters.Converter;
+
+import java.math.BigDecimal;
+
+@Provider
+public class WeightTextConverter implements Converter<BigDecimal> {
+
+    @Override
+    public Class<BigDecimal> getTargetClass() {
+        return BigDecimal.class;
+    }
+
+    @Override
+    public String toString(BigDecimal value) {
+        return value.toPlainString();
+    }
+
+    @Override
+    public BigDecimal toObject(String value) {
+        return new BigDecimal(value);
+    }
+}
+```
+
+```java
+String text = Converters.convert(weight);                 // BigDecimal -> String
+BigDecimal weight = Converters.convert(BigDecimal.class, "42.5");  // String -> BigDecimal
+```
+
+You'll reach for this far less often than a view converter — mainly when you need the same
+string↔object logic to work outside of any UI component (a CSV import, a config parameter).
+
+<CardGrid>
+  <Card title="View converter" icon="laptop">
+    `org.zkoss.bind.Converter&lt;UI,BEAN,Component&gt;` — `params.converter` in YAML, no annotation, referenced by class name.
+  </Card>
+  <Card title="Type converter" icon="setting">
+    `tools.dynamia.io.converters.Converter&lt;T&gt;` — `@Provider` bean, looked up by target class via `Converters`.
+  </Card>
+</CardGrid>
+
+## Related
+
+- [View Descriptors](/view-descriptors) — the full `params.converter` reference and table/export field syntax.
+- [View Customizers](/guides/view-customizers) — the sibling extension point for behavior instead of formatting.
+- [Quick Reference](/reference/quick-reference) — condensed YAML view-descriptor cheat-sheet.

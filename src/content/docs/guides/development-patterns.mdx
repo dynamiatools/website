@@ -1,0 +1,281 @@
+---
+title: Development Patterns & Best Practices
+description: Curated do's and don'ts for entities, services, actions, validators, customizers, and views in Dynamia Platform, plus named anti-patterns to avoid.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Dynamia Platform gives you a lot of structure out of the box — `BaseEntity`, `CrudService`, `Action`, `Validator`, `ViewCustomizer` — but structure alone doesn't stop you from writing a God Object or an anemic entity. This guide distills the patterns that consistently produce maintainable code, and the anti-patterns that quietly rot a codebase even though "it still compiles."
+
+If you haven't read [Key Concepts](/key-concepts) yet, start there — this guide assumes you know what a `Module`, `Action`, and view descriptor are.
+
+## Entities: inherit `BaseEntity`, don't duplicate what it gives you
+
+`BaseEntity` already provides the id strategy and audit fields (`creationDate`, `creator`, etc.). Extending it — instead of rolling your own `@Id` — keeps every entity in the app consistent and lets `CrudService` and the CRUD UI work without extra wiring.
+
+```java
+//demo/Contact.java
+package demo;
+
+import jakarta.persistence.*;
+import tools.dynamia.domain.jpa.BaseEntity;
+
+@Entity
+@Table(name = "contacts")
+public class Contact extends BaseEntity {
+
+    private String name;
+    private String email;
+
+    @ManyToOne
+    @JoinColumn(name = "company_id")
+    private Company company;
+
+    @Enumerated(EnumType.STRING)
+    private ContactStatus status;
+
+    // Business methods belong here, not just getters/setters
+    public boolean isActive() {
+        return status == ContactStatus.ACTIVE;
+    }
+}
+```
+
+```java
+// Wrong: manual id, no audit trail, no business logic
+@Entity
+public class Contact {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+    // status stored as a raw String elsewhere — typos become production bugs
+}
+```
+
+A related trap: storing enums as `String`/`Integer` columns instead of `@Enumerated(EnumType.STRING)`. It looks harmless until someone renames a value and every existing row silently becomes invalid data with no compiler warning.
+
+## Services: constructor injection, `@Transactional` at the boundary
+
+Field injection (`@Autowired` on a field) and, worse, hand-rolled singletons/service locators make classes hard to test and hide real dependencies. Constructor injection makes the dependency graph explicit and lets you build the service in a unit test with plain `new`.
+
+```java
+//demo/OrderService.java
+package demo;
+
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+import tools.dynamia.domain.services.CrudService;
+
+@Service
+public class OrderService {
+
+    private final CrudService crudService;
+    private final EmailService emailService;
+
+    public OrderService(CrudService crudService, EmailService emailService) {
+        this.crudService = crudService;
+        this.emailService = emailService;
+    }
+
+    @Transactional
+    public Order createOrder(Order order, List<OrderLine> lines) {
+        Order saved = crudService.save(order);
+        lines.forEach(line -> {
+            line.setOrder(saved);
+            crudService.save(line);
+        });
+        emailService.sendOrderConfirmation(saved); // rolled back with the rest on failure
+        return saved;
+    }
+}
+```
+
+```java
+// Wrong: no transaction boundary — a failed email send leaves the order
+// persisted but the surrounding operation half-done
+public Order createOrder(Order order, List<OrderLine> lines) {
+    Order saved = crudService.save(order);
+    emailService.sendOrderConfirmation(saved); // could throw after the save
+    return saved;
+}
+```
+
+The other half of this pattern: business logic lives in the **service**, not scattered into the entity's lifecycle callbacks or the view's click handler. An entity can expose `isActive()`/`activate()` as self-contained state transitions, but anything that needs a collaborator (email, notifications, external calls) belongs in a service — entities should never depend on Spring beans.
+
+## `ModuleProvider`: register as a Spring bean, always
+
+The single most common mistake with `ModuleProvider` isn't a design flaw — it's forgetting `@Component`. Without it, the framework's classpath scan never discovers the module and it silently doesn't appear in navigation.
+
+```java
+//demo/CrmModuleProvider.java
+package demo;
+
+import org.springframework.stereotype.Component;
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+import tools.dynamia.navigation.PageGroup;
+
+@Component
+public class CrmModuleProvider implements ModuleProvider {
+
+    @Override
+    public Module getModule() {
+        Module module = new Module("crm", "CRM");
+        module.setIcon("business");
+        module.setPosition(10);
+
+        PageGroup contacts = new PageGroup("contacts-group", "Contacts");
+        contacts.addPage(new CrudPage("contacts", "All Contacts", Contact.class));
+        module.addPageGroup(contacts);
+
+        return module;
+    }
+}
+```
+
+If a module needs to vary its pages by permission or tenant data, inject the collaborators through the constructor like any other bean — `ModuleProvider` is just a Spring component that happens to build a `Module`.
+
+## Actions: encapsulate behavior, don't hardcode queries in `actionPerformed`
+
+An `Action` that reaches straight into `EntityManager` for a hardcoded JPQL query, or that mutates an entity without going through a service, defeats the point of having actions at all — that logic becomes unreusable and untestable. Keep actions thin: validate applicability, delegate to a service, report the result.
+
+```java
+//demo/actions/ActivateContactAction.java
+package demo.actions;
+
+import tools.dynamia.actions.AbstractCrudAction;
+import tools.dynamia.actions.CrudActionEvent;
+import tools.dynamia.actions.InstallAction;
+
+@InstallAction
+public class ActivateContactAction extends AbstractCrudAction {
+
+    private final ContactService contactService;
+
+    public ActivateContactAction(ContactService contactService) {
+        setId("ActivateContactAction");
+        setName("Activate");
+        setIcon("check");
+        this.contactService = contactService;
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        Contact contact = (Contact) evt.getData();
+        if (contact == null || contact.getStatus() != ContactStatus.INACTIVE) {
+            return;
+        }
+        contactService.activateContact(contact);
+    }
+}
+```
+
+`isEnabled()`/`isVisible()` (both no-argument) are for conditions that apply to the action as a
+whole — feature flags, roles, licensing. A condition that depends on the **specific row**, like
+this one, is checked inside `actionPerformed` itself instead. See [How Actions Work](/guides/actions)
+for the full lifecycle.
+
+## Validators: keep validation out of the entity
+
+A `@PrePersist` method that throws a raw `RuntimeException` is a trap: it fires at flush time, deep inside a transaction, with no structured error the UI can render field-by-field. `Validator<T>` implementations registered with `@InstallValidator` run before persistence and throw a `ValidationError` — with an optional field name the UI can highlight — instead.
+
+```java
+//demo/ContactEmailValidator.java
+package demo;
+
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.domain.Validator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.InstallValidator;
+
+@InstallValidator
+public class ContactEmailValidator implements Validator<Contact> {
+
+    private final CrudService crudService;
+
+    public ContactEmailValidator(CrudService crudService) {
+        this.crudService = crudService;
+    }
+
+    @Override
+    public void validate(Contact contact) throws ValidationError {
+        if (contact.getEmail() != null && contact.getId() == null
+                && crudService.findFirst(Contact.class, "email", contact.getEmail()) != null) {
+            throw new ValidationError("Email already registered", contact.getEmail(), "email", Contact.class);
+        }
+    }
+}
+```
+
+## Customizers and views: modify the descriptor, don't fork the view
+
+A `ViewCustomizer` mutates the fully-built form at render time — hide a field for non-admins, mark another read-only, wire a listener — instead of you maintaining two near-duplicate `*Form.yml` files. It's referenced from YAML by class name (`customizer: demo.ContactFormCustomizer`), not registered as a Spring bean — it's instantiated by reflection with a no-arg constructor, so no `@Autowired` collaborators. See [View Customizers](/guides/view-customizers) and [View Descriptors](/view-descriptors) for the full reference.
+
+```java
+//demo/ContactFormCustomizer.java
+package demo;
+
+import tools.dynamia.integration.Containers;
+import tools.dynamia.viewers.ViewCustomizer;
+import tools.dynamia.zk.viewers.form.FormFieldComponent;
+import tools.dynamia.zk.viewers.form.FormView;
+
+public class ContactFormCustomizer implements ViewCustomizer<FormView<Contact>> {
+
+    @Override
+    public void customize(FormView<Contact> view) {
+        FormFieldComponent creditLimit = view.getFieldComponent("creditLimit");
+        // ViewCustomizer has no Spring context — resolve collaborators through the
+        // Containers service-locator instead of @Autowired
+        SecurityService securityService = Containers.get().findObject(SecurityService.class);
+        boolean isAdmin = securityService != null && securityService.hasRole("ADMIN");
+        if (!isAdmin) {
+            creditLimit.hide();
+        }
+    }
+}
+```
+
+The corresponding anti-pattern — validation and persistence logic living inside a ZK `Window`/form class — mixes UI and business concerns and can't be reused by the REST API or a batch job that touches the same entity.
+
+## Error handling and performance, briefly
+
+Two habits worth calling out explicitly:
+
+- **Fail loudly with typed exceptions**, not `null` returns or swallowed `catch (Exception e) { e.printStackTrace(); }` — a `@RestControllerAdvice` mapping `ContactNotFoundException` → `404` gives callers something they can branch on. Batch operations should collect per-item errors into a result object instead of aborting or silently skipping.
+- **Default to lazy, opt into eager**: `@OneToMany` and `@Lob` fields should stay `FetchType.LAZY`; when you know you need the association for one read, use a `JOIN FETCH` query instead of iterating a lazy collection per row (classic N+1). Always paginate list endpoints with `Pageable` rather than returning `findAll()` unbounded.
+
+<Aside type="tip">
+Full request/response shapes for pagination and error envelopes are on the [Quick Reference](/reference/quick-reference) cheat sheet.
+</Aside>
+
+## Anti-patterns to name and avoid
+
+<CardGrid>
+  <Card title="God Object" icon="warning">
+    One service doing validation, persistence, email, reports, and export. Split by responsibility — `ContactService`, `ContactNotificationService`, `ContactReportService`.
+  </Card>
+  <Card title="Anemic Entities" icon="warning">
+    Entities that are pure getter/setter bags with zero behavior. Move self-contained state logic (`isActive()`, `activate()`) into the entity itself.
+  </Card>
+  <Card title="Leaky Abstraction" icon="warning">
+    A service that hands out raw JPQL/`EntityManager` results instead of going through `CrudService`. Callers end up coupled to JPA instead of the framework's abstraction.
+  </Card>
+  <Card title="Tight Coupling" icon="warning">
+    Depending on a concrete repository class (`MySqlContactRepository`) instead of `CrudService`. Makes swapping persistence or writing unit tests painful.
+  </Card>
+  <Card title="Silent Failures" icon="warning">
+    Catching and discarding exceptions in a loop (`e.printStackTrace()` and move on). Return a structured result with successes and per-item errors instead.
+  </Card>
+  <Card title="Mixing Concerns in Views" icon="warning">
+    Validation and save logic written directly inside a ZK window's click handler. Delegate to a service so the same logic works from the REST layer too.
+  </Card>
+</CardGrid>
+
+---
+
+**Related guides:** [Key Concepts](/key-concepts) · [How Actions Work](/guides/actions) · [View Descriptors](/view-descriptors) · [Quick Reference](/reference/quick-reference)

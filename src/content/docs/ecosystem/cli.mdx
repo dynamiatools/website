@@ -1,0 +1,110 @@
+---
+title: CLI
+description: Scaffold new Dynamia Platform projects from the command line with @dynamia-tools/cli — the dynamia new wizard for backend and frontend stacks.
+---
+
+import { Card, CardGrid, Aside, LinkButton } from '@astrojs/starlight/components';
+
+`@dynamia-tools/cli` is the official command-line scaffolder for Dynamia Platform. Instead of hand-assembling a `pom.xml`, a Spring Boot entry point and a frontend build from scratch, `dynamia new` walks you through a short wizard and generates a ready-to-run backend, frontend, or both — wired to the current framework version.
+
+<Aside type="caution" title="Beta">
+  The CLI is in active beta. If a command or template isn't ready yet, you get a friendly "not available yet" message instead of a broken generation. Errors carry short support codes (e.g. `DT-TEMPLATE-002`) to make issue reports easier to triage.
+</Aside>
+
+## Install
+
+Two ways to get the CLI on your machine.
+
+### One-line bootstrap (Linux & macOS)
+
+Installs JDK 25, Node.js LTS, and the CLI in one shot — the fastest path on a fresh machine:
+
+```bash
+curl -fsSL https://get.dynamia.tools | bash
+```
+
+### npm (global)
+
+Already have Node.js? Install just the CLI:
+
+```bash
+npm install -g @dynamia-tools/cli
+```
+
+### Requirements
+
+| Tool | Minimum version |
+|---|---|
+| Node.js | 24 |
+| git | any recent version (required) |
+| Java | 25 (recommended) |
+
+## Scaffold a project
+
+```bash
+dynamia new
+```
+
+The wizard asks:
+
+1. **Project name** — lowercase, letters/numbers/hyphens only
+2. **Scaffold choice** — Backend + Frontend / Backend only / Frontend only
+3. **Backend language** — Java, Kotlin, or Groovy
+4. **Maven coordinates** — Group ID, Artifact ID, version, description
+5. **Frontend framework** — Vue 3 or React
+6. **Package manager** — pnpm, npm, or yarn
+7. **Confirm** — a summary table before anything is generated
+
+### What happens under the hood
+
+**Backend**
+
+- Cloned from a GitHub template repo (e.g. `dynamiatools/template-backend-java`), with the repo and branch validated before cloning
+- The placeholder package `com.example.demo` is renamed to your chosen `groupId.artifactId`
+- Tokens are replaced across `.java`, `.kt`, `.groovy`, `.xml`, `.yml`, `.properties`, `.md`
+- `DemoApplication.java` is renamed to `<YourArtifactId>Application.java`
+
+**Frontend**
+
+- Cloned from a GitHub template repo (e.g. `dynamiatools/template-frontend-vue`), same validation as the backend
+- Falls back to `npm create vite@latest` if the template clone or validation fails
+- `@dynamia-tools/sdk` and `@dynamia-tools/ui-core` are installed automatically
+
+## Generated layout
+
+```
+my-erp-app/
+├── backend/     Spring Boot + Dynamia Tools (Java/Kotlin/Groovy)
+└── frontend/    Vue 3 or React + Vite + @dynamia-tools/vue|sdk
+```
+
+The backend is a standard Spring Boot project with the [DynamiaTools starter](/getting-started) already on the classpath — open it and start adding [entities and modules](/key-concepts) right away. The frontend is a Vite project pre-wired with the [SDK and Vue integration](/frontend-sdk) so it can talk to the generated backend's REST API immediately.
+
+<Aside type="tip">
+  All versions, template repositories, and URLs the CLI uses live in a single `cli.properties` file inside the package — the CLI code never hardcodes a version or URL, so template repos and enabled/disabled stacks can evolve independently of a CLI release.
+</Aside>
+
+## Template repositories
+
+Backend and frontend scaffolds are plain GitHub repos under the `dynamiatools` org (e.g. `dynamiatools/template-backend-java`, `dynamiatools/template-frontend-vue`). If you're building your own internal template rather than just using the CLI, the source repos use a small placeholder-token convention (`{{GROUP_ID}}`, `{{BASE_PACKAGE}}`, `{{DYNAMIA_VERSION}}`, etc.) so the CLI can rewrite them at generation time — see the [CLI package README](https://github.com/dynamiatools/framework/blob/master/platform/packages/cli/README.md) if you need the full authoring reference.
+
+## Where to next
+
+<CardGrid>
+  <Card title="Getting Started" icon="rocket">
+    Once your backend is generated, follow the getting-started guide to add your first entity, module and view descriptor.
+    <LinkButton href="/getting-started" variant="minimal">Getting Started →</LinkButton>
+  </Card>
+  <Card title="Templates & Themes" icon="setting">
+    The generated backend ships with the Dynamical UI theme by default — see how to configure and skin it.
+    <LinkButton href="/ecosystem/themes" variant="minimal">Templates & Themes →</LinkButton>
+  </Card>
+  <Card title="Quick Reference" icon="document">
+    A terse cheat-sheet for entities, CrudService, navigation and view descriptors once your project is generated.
+    <LinkButton href="/reference/quick-reference" variant="minimal">Quick Reference →</LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+Links: [GitHub org](https://github.com/dynamiatools) · [`@dynamia-tools/cli` on npm](https://www.npmjs.com/package/@dynamia-tools/cli) · License Apache-2.0 © Dynamia Soluciones IT SAS

@@ -1,19 +1,27 @@
 ---
 title: Entity Files
-description: Attach and serve files linked to entities, with optional S3, MinIO or Buckie storage
+description: Attach and serve files linked to entities, with pluggable local, S3 or Buckie storage
 ---
 
 import { LinkButton, Aside } from '@astrojs/starlight/components';
 
 ## What this extension does
 
-Entity Files lets you attach files to JPA entities and store binary content either:
+Entity Files lets you attach files to any JPA entity and store binary content on a pluggable backend, while file **metadata** (name, content type, size, owning entity) is always persisted in the database via the `EntityFile` JPA entity (table `mod_entity_files`).
 
-- on local disk (default),
-- on AWS S3 or MinIO (optional modules), or
-- on a **[Buckie](/buckie/)** server (optional module).
+Shipped storage backends:
 
-It also includes UI actions to manage files from CRUD views.
+- **local disk** (`LocalEntityFileStorage`) — the default, no extra dependency,
+- **AWS S3** (`S3EntityFileStorage`, module `tools.dynamia.modules.entityfiles.s3`),
+- **[Buckie](/buckie/)** — a self-hosted, S3-style file server built by DynamiaTools.
+
+It also includes UI actions (`FileAction`) to manage files directly from CRUD table/tree views.
+
+<Aside type="caution" title="MinIO — check availability for your version">
+  The extension's own README documents a `tools.dynamia.modules.entityfiles.minio` artifact and a `MinioEntityFileStorage` implementation, but at the time of writing the module's `sources/pom.xml` only builds `core`, `ui`, and `s3` — there is no `minio` submodule in the current source tree. Verify the artifact actually resolves for your framework version before depending on it.
+
+  In practice this is not a blocker: MinIO exposes an S3-compatible API, and the `s3` module's client builder (`S3Utils`) already supports a **custom endpoint override** — useful for pointing `S3EntityFileStorage` at a MinIO (or SeaweedFS) server instead of AWS, without needing a dedicated module.
+</Aside>
 
 <Aside type="tip" title="Buckie — self-hosted file server">
   **Buckie** is a lightweight, self-hosted file server with an S3-style REST API built by DynamiaTools.
@@ -37,17 +45,10 @@ It also includes UI actions to manage files from CRUD views.
   <version>VERSION</version>
 </dependency>
 
+<!-- Optional: AWS S3 (or any S3-compatible endpoint, e.g. MinIO) -->
 <dependency>
   <groupId>tools.dynamia.modules</groupId>
   <artifactId>tools.dynamia.modules.entityfiles.s3</artifactId>
-  <version>VERSION</version>
-</dependency>
-```
-
-```xml
-<dependency>
-  <groupId>tools.dynamia.modules</groupId>
-  <artifactId>tools.dynamia.modules.entityfiles.minio</artifactId>
   <version>VERSION</version>
 </dependency>
 ```
@@ -57,8 +58,7 @@ It also includes UI actions to manage files from CRUD views.
 ```groovy
 implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles:VERSION'
 implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.ui:VERSION'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:VERSION'
-implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.minio:VERSION'
+implementation 'tools.dynamia.modules:tools.dynamia.modules.entityfiles.s3:VERSION' // optional
 ```
 
 ## Frontend package
@@ -115,5 +115,55 @@ public class PersonFilesService {
         person.setPhoto(photo);
     }
 }
+```
+
+## EntityFileService — central API
+
+`EntityFileService` is the single entry point to attach, read, and remove files for **any** JPA entity, independent of the storage backend in use — your code never talks to `LocalEntityFileStorage` or `S3EntityFileStorage` directly.
+
+```java
+//PersonFilesService.java
+package myapp.people;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import tools.dynamia.modules.entityfile.UploadFileInfo;
+import tools.dynamia.modules.entityfile.domain.EntityFile;
+import tools.dynamia.modules.entityfile.service.EntityFileService;
+
+import java.io.File;
+
+@Component
+public class PersonFilesService {
+
+    @Autowired
+    private EntityFileService entityFileService;
+
+    public EntityFile attachContract(File pdf, Person person) {
+        var info = new UploadFileInfo(pdf);
+        return entityFileService.createEntityFile(info, person);
+    }
+}
+```
+
+## Storage backends (`EntityFileStorage`)
+
+Internally, `EntityFileService` delegates the actual byte transfer to an `EntityFileStorage` implementation, resolved from configuration:
+
+| Implementation | Module | Notes |
+|---|---|---|
+| `LocalEntityFileStorage` | `entityfiles` (core) | Default — writes to a local base directory |
+| `S3EntityFileStorage` | `entityfiles.s3` | AWS S3, or any S3-compatible endpoint (see MinIO note above) |
+
+You can also provide your own `EntityFileStorage` bean (e.g. to wire up **Buckie**) — it will be picked up like any other Spring bean.
+
+## Managing files from the UI
+
+Beyond wiring `EntityFile` fields on an entity, the UI module installs a `FileAction` that shows up automatically in `CrudState.READ` (table/tree row actions), letting users upload/download/delete attached files without any extra descriptor configuration. The same file explorer can be triggered from your own code:
+
+```java
+import tools.dynamia.modules.entityfile.ui.util.EntityFileUtils;
+
+EntityFileUtils.showFileExplorer(person);
 ```
 
