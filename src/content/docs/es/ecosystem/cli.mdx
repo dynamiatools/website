@@ -1,0 +1,110 @@
+---
+title: CLI
+description: Crea nuevos proyectos de Dynamia Platform desde la línea de comandos con @dynamia-tools/cli — el asistente `dynamia new` para stacks de backend y frontend.
+---
+
+import { Card, CardGrid, Aside, LinkButton } from '@astrojs/starlight/components';
+
+`@dynamia-tools/cli` es el scaffolder oficial de línea de comandos para Dynamia Platform. En lugar de ensamblar a mano un `pom.xml`, un punto de entrada de Spring Boot y un build de frontend desde cero, `dynamia new` te guía con un breve asistente y genera un backend, un frontend, o ambos, listos para ejecutar — conectados a la versión actual del framework.
+
+<Aside type="caution" title="Beta">
+  El CLI está en beta activa. Si un comando o plantilla aún no está listo, recibes un mensaje amigable de "no disponible todavía" en lugar de una generación rota. Los errores incluyen códigos de soporte cortos (por ejemplo `DT-TEMPLATE-002`) para facilitar el triage de reportes.
+</Aside>
+
+## Instalación
+
+Dos formas de tener el CLI en tu máquina.
+
+### Bootstrap de una línea (Linux y macOS)
+
+Instala JDK 25, Node.js LTS y el CLI de una sola vez — la ruta más rápida en una máquina nueva:
+
+```bash
+curl -fsSL https://get.dynamia.tools | bash
+```
+
+### npm (global)
+
+¿Ya tienes Node.js? Instala solo el CLI:
+
+```bash
+npm install -g @dynamia-tools/cli
+```
+
+### Requisitos
+
+| Herramienta | Versión mínima |
+|---|---|
+| Node.js | 24 |
+| git | cualquier versión reciente (requerido) |
+| Java | 25 (recomendado) |
+
+## Crear un proyecto
+
+```bash
+dynamia new
+```
+
+El asistente pregunta:
+
+1. **Nombre del proyecto** — minúsculas, solo letras/números/guiones
+2. **Tipo de scaffold** — Backend + Frontend / Solo backend / Solo frontend
+3. **Lenguaje del backend** — Java, Kotlin o Groovy
+4. **Coordenadas Maven** — Group ID, Artifact ID, versión, descripción
+5. **Framework de frontend** — Vue 3 o React
+6. **Gestor de paquetes** — pnpm, npm o yarn
+7. **Confirmación** — una tabla resumen antes de generar nada
+
+### Qué pasa por dentro
+
+**Backend**
+
+- Se clona desde un repositorio plantilla de GitHub (por ejemplo `dynamiatools/template-backend-java`), validando el repositorio y la rama antes de clonar
+- El paquete placeholder `com.example.demo` se renombra a tu `groupId.artifactId` elegido
+- Los tokens se reemplazan en archivos `.java`, `.kt`, `.groovy`, `.xml`, `.yml`, `.properties`, `.md`
+- `DemoApplication.java` se renombra a `<TuArtifactId>Application.java`
+
+**Frontend**
+
+- Se clona desde un repositorio plantilla de GitHub (por ejemplo `dynamiatools/template-frontend-vue`), con la misma validación que el backend
+- Si falla el clonado o la validación de la plantilla, recurre a `npm create vite@latest`
+- `@dynamia-tools/sdk` y `@dynamia-tools/ui-core` se instalan automáticamente
+
+## Estructura generada
+
+```
+my-erp-app/
+├── backend/     Spring Boot + Dynamia Tools (Java/Kotlin/Groovy)
+└── frontend/    Vue 3 o React + Vite + @dynamia-tools/vue|sdk
+```
+
+El backend es un proyecto Spring Boot estándar con el [starter de DynamiaTools](/es/getting-started) ya en el classpath — ábrelo y empieza a agregar [entidades y módulos](/es/key-concepts) de inmediato. El frontend es un proyecto Vite preconfigurado con el [SDK y la integración con Vue](/es/frontend-sdk) para poder comunicarse con la API REST del backend generado de inmediato.
+
+<Aside type="tip">
+  Todas las versiones, repositorios de plantillas y URLs que usa el CLI viven en un único archivo `cli.properties` dentro del paquete — el código del CLI nunca hardcodea una versión o URL, así que los repositorios de plantillas y los stacks habilitados/deshabilitados pueden evolucionar de forma independiente a una versión del CLI.
+</Aside>
+
+## Repositorios de plantillas
+
+Los scaffolds de backend y frontend son repositorios de GitHub simples bajo la organización `dynamiatools` (por ejemplo `dynamiatools/template-backend-java`, `dynamiatools/template-frontend-vue`). Si estás construyendo tu propia plantilla interna en lugar de usar solo el CLI, los repositorios fuente usan una pequeña convención de tokens placeholder (`{{GROUP_ID}}`, `{{BASE_PACKAGE}}`, `{{DYNAMIA_VERSION}}`, etc.) para que el CLI pueda reescribirlos al momento de generar — consulta el [README del paquete CLI](https://github.com/dynamiatools/framework/blob/master/platform/packages/cli/README.md) si necesitas la referencia completa de autoría.
+
+## Hacia dónde seguir
+
+<CardGrid>
+  <Card title="Comenzando" icon="rocket">
+    Una vez generado tu backend, sigue la guía de comenzando para agregar tu primera entidad, módulo y descriptor de vista.
+    <LinkButton href="/es/getting-started" variant="minimal">Comenzando →</LinkButton>
+  </Card>
+  <Card title="Plantillas y Temas" icon="setting">
+    El backend generado incluye el tema Dynamical por defecto — mira cómo configurarlo y personalizarlo.
+    <LinkButton href="/es/ecosystem/themes" variant="minimal">Plantillas y Temas →</LinkButton>
+  </Card>
+  <Card title="Referencia Rápida" icon="document">
+    Un cheat-sheet conciso de entidades, CrudService, navegación y descriptores de vista una vez generado tu proyecto.
+    <LinkButton href="/es/reference/quick-reference" variant="minimal">Referencia Rápida →</LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+Enlaces: [Organización en GitHub](https://github.com/dynamiatools) · [`@dynamia-tools/cli` en npm](https://www.npmjs.com/package/@dynamia-tools/cli) · Licencia Apache-2.0 © Dynamia Soluciones IT SAS

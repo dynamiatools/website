@@ -1,0 +1,179 @@
+---
+title: Validators
+description: Validación de reglas de negocio con Validator<T> y @InstallValidator — comprobaciones a nivel de campo y entre entidades que se ejecutan antes de la persistencia, y por qué no pertenecen a @PrePersist.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Las anotaciones de Bean Validation (`@NotNull`, `@Size`, `@Pattern`, ...) cubren la forma —
+si el campo está presente, cuál es su longitud, qué formato tiene. `Validator<T>` cubre todo lo
+que Bean Validation no puede expresar por sí solo: comprobaciones de unicidad contra la base de
+datos, reglas entre campos, lógica condicional según el estado de la entidad, o cualquier cosa
+que necesite un colaborador como `CrudService`.
+
+## El contrato `Validator<T>`
+
+```java
+package tools.dynamia.domain;
+
+public interface Validator<T> {
+    void validate(T t) throws ValidationError;
+}
+```
+
+Un solo método. O retorna normalmente (el objeto es válido) o lanza `ValidationError` — no hay
+una lista de errores que construir y devolver; cada regla que falla lanza inmediatamente con un
+mensaje que describe qué está mal. `ValidationError` extiende
+`jakarta.validation.ValidationException` y tiene algunos constructores que vale la pena conocer:
+
+```java
+throw new ValidationError("Email is required");
+
+throw new ValidationError("Ship date must be after %s", order.getOrderDate());
+
+throw new ValidationError("Price cannot be negative", product.getPrice(), "price", Product.class);
+//                          message                     invalidValue     property   entityClass
+```
+
+La forma de cuatro argumentos es lo que le permite a la UI resaltar el campo específico
+(`"price"`) en lugar de mostrar solo un aviso genérico.
+
+## Registrar un validator: `@InstallValidator`
+
+`@InstallValidator` (`tools.dynamia.domain.InstallValidator`) marca la clase como un bean de
+Spring con scope prototype. El framework descubre cada `Validator` en el contexto y ejecuta los
+que aplican — determinados por su parámetro de tipo genérico — antes de `CrudService.create()`,
+`update()` y `save()`.
+
+```java
+//mybookstore/validators/BookValidator.java
+package mybookstore.validators;
+
+import mybookstore.domain.Book;
+import tools.dynamia.domain.InstallValidator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.Validator;
+
+import java.math.BigDecimal;
+
+@InstallValidator
+public class BookValidator implements Validator<Book> {
+
+    @Override
+    public void validate(Book book) throws ValidationError {
+        if (book.getTitle() == null || book.getTitle().isBlank()) {
+            throw new ValidationError("Title is required", null, "title", Book.class);
+        }
+
+        if (book.getPrice() != null && book.getPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ValidationError("Price must be zero or positive", book.getPrice(), "price", Book.class);
+        }
+
+        if (book.isOnSale() && book.getSalePrice() == null) {
+            throw new ValidationError("Sale price is required when the book is on sale",
+                    null, "salePrice", Book.class);
+        }
+    }
+}
+```
+
+## Validación entre entidades (unicidad, reglas de base de datos)
+
+Inyecta `CrudService` por constructor para reglas que necesitan consultar la base de datos — una
+comprobación de unicidad es el caso de libro de texto:
+
+```java
+//mybookstore/validators/InvoiceValidator.java
+package mybookstore.validators;
+
+import mybookstore.domain.Invoice;
+import tools.dynamia.domain.InstallValidator;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.Validator;
+import tools.dynamia.domain.services.CrudService;
+
+@InstallValidator
+public class InvoiceValidator implements Validator<Invoice> {
+
+    private final CrudService crudService;
+
+    public InvoiceValidator(CrudService crudService) {
+        this.crudService = crudService;
+    }
+
+    @Override
+    public void validate(Invoice invoice) throws ValidationError {
+        if (invoice.getDetails() == null || invoice.getDetails().isEmpty()) {
+            throw new ValidationError("Invoice must have at least one line", null, "details", Invoice.class);
+        }
+
+        if (invoice.getNumber() != null && invoice.isNew()) {
+            long count = crudService.count(Invoice.class, "number", invoice.getNumber());
+            if (count > 0) {
+                throw new ValidationError("Invoice number already exists", invoice.getNumber(), "number", Invoice.class);
+            }
+        }
+    }
+}
+```
+
+<Aside type="tip">
+Los validators son singletons sin estado (bueno, con scope prototype, pero trátalos como si no
+tuvieran estado) — nunca mutes la entidad dentro de `validate()`. Si necesitas derivar o
+normalizar un valor antes de guardar, eso pertenece a un
+[`CrudServiceListener`](/es/guides/crud-listeners) o a un `@Service`, no aquí.
+</Aside>
+
+## ¿Por qué no `@PrePersist`/`@PreUpdate`?
+
+Es tentador poner una comprobación directamente en la entidad:
+
+```java
+// No hagas esto
+@PrePersist
+public void validate() {
+    if (email == null) {
+        throw new RuntimeException("Email is required");
+    }
+}
+```
+
+Hay tres problemas concretos con este enfoque:
+
+1. **Se dispara a mitad del flush, dentro de la transacción.** Para cuando Hibernate llama a
+   `@PrePersist`, ya estás en las profundidades de `EntityManager` — la excepción que lanzas
+   tiene que propagarse a través de la maquinaria de JPA en lugar de capturarse limpiamente en
+   el punto donde se llamó a `CrudService.save()`.
+2. **No hay un error estructurado y direccionable por campo.** Una `RuntimeException` (o incluso
+   un `ValidationError` lanzado aquí) no le da a la UI un par `(property, value)` que resaltar —
+   pierdes el feedback por campo que te da el constructor de cuatro argumentos de
+   `ValidationError` dentro de un `Validator`.
+3. **Las entidades no pueden recibir inyección por constructor**, así que cualquier regla que
+   necesite `CrudService` u otro bean simplemente es inalcanzable desde un callback de ciclo de
+   vida sin recurrir a trucos de tipo service-locator estático — que es un anti-patrón en sí
+   mismo.
+
+`Validator<T>` se ejecuta en la capa correcta (el límite de `CrudService`), con las herramientas
+adecuadas (inyección de dependencias, errores estructurados) exactamente para este trabajo.
+
+<CardGrid>
+  <Card title="A nivel de campo" icon="pencil">
+    Presencia, formato y rangos simples — usualmente más económico como anotaciones de Bean
+    Validation (`@NotNull`, `@Pattern`) directamente en la entidad, salvo que el mensaje deba ser
+    dinámico.
+  </Card>
+  <Card title="Entre entidades" icon="magnifier">
+    Unicidad, reglas referenciales, cualquier cosa que necesite `CrudService` — siempre un
+    `Validator<T>`.
+  </Card>
+</CardGrid>
+
+## Relacionado
+
+- [Entities](/es/guides/entities) — por qué los callbacks de ciclo de vida no son el lugar para
+  reglas de negocio.
+- [CrudServiceListener](/es/guides/crud-listeners) — para valores derivados/efectos secundarios,
+  a diferencia de rechazar datos inválidos.
+- [Development Patterns](/es/guides/development-patterns) — el patrón validator en el contexto
+  más amplio de buenas prácticas.
+- [Quick Reference](/es/reference/quick-reference) — referencia condensada de validators.

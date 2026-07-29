@@ -1,0 +1,233 @@
+---
+title: HTTP Functions
+description: Define capacidades de negocio versionadas e invocables como registros DynamiaHttpFunction, y llámalas desde Java o por HTTP sin codificar un cliente REST para cada integración.
+---
+
+import { Aside, LinkButton } from '@astrojs/starlight/components';
+
+La extensión HTTP Functions ofrece un runtime de funciones declarativo y versionado, expuesto por HTTP. En lugar de codificar un `RestTemplate`/`RestClient` para cada integración externa — "cómo llamar a WhatsApp", "cómo generar este PDF", "cómo llegar a esa API de terceros" — configuras una `DynamiaHttpFunction` una sola vez (método, URL, plantilla de cuerpo, cabeceras) y la invocas por nombre desde Java o directamente por HTTP. Las credenciales, los endpoints y la forma del payload pueden cambiar después sin tocar el código de la aplicación ni redesplegar.
+
+Piénsalo como un bus interno de capacidades para aplicaciones basadas en Dynamia.
+
+## Agregarlo a un proyecto
+
+```xml
+<dependency>
+    <groupId>tools.dynamia.modules</groupId>
+    <artifactId>tools.dynamia.modules.functions.core</artifactId>
+    <version>26.7.0</version>
+</dependency>
+
+<!-- Opcional: CRUD de back office + acción "Test" (basado en ZK) -->
+<dependency>
+    <groupId>tools.dynamia.modules</groupId>
+    <artifactId>tools.dynamia.modules.functions.ui</artifactId>
+    <version>26.7.0</version>
+</dependency>
+```
+
+No se requiere configuración adicional — `DynamiaHttpFunctionsServiceImpl` y el controlador REST se autorregistran mediante el escaneo estándar de componentes `@Service` en cuanto `core` está en el classpath.
+
+## Modelo central
+
+### `DynamiaHttpFunction`
+
+Una definición de función versionada:
+
+| Campo | Descripción |
+|---|---|
+| `name` | Identificador, p. ej. `WhatsApp.sendMessage`. Es libre, pero la convención recomendada es `Namespace.accion`. |
+| `functionVersion` | Entero, empieza en 1. |
+| `method` | Método HTTP para la llamada saliente (`HttpMethod`). |
+| `url` | URL de destino. Admite placeholders `${param}`. |
+| `contentType` | Por defecto `application/json`. |
+| `bodyTemplate` | Plantilla del cuerpo de la petición. Admite placeholders `${param}`. |
+| `headers` | Una línea `Header-Name: value` por cabecera. Admite `${param}` — la forma habitual de inyectar API keys/tokens. |
+| `status` | `DRAFT`, `ACTIVE`, `INACTIVE`, `DELETED`. Solo las funciones `ACTIVE` pueden invocarse. |
+| `metadata` | JSON libre, solo informativo — no lo usa el motor de ejecución. |
+| `parameters` | Lista de `DynamiaHttpFunctionParameter`. |
+
+`url`, `bodyTemplate` y `headers` se renderizan contra los parámetros de la llamada antes de salir la petición, usando placeholders `${paramName}`. `(name, functionVersion)` es único por cuenta — reforzado tanto por un índice de base de datos como por `DynamiaHttpFunctionValidator` — y una función no puede pasar a `ACTIVE` sin una `url`.
+
+### `DynamiaHttpFunctionParameter`
+
+Una entrada declarada por parámetro:
+
+| Campo | Descripción |
+|---|---|
+| `name` | Se compara contra el mapa `params` en tiempo de llamada. |
+| `type` | `STRING` (por defecto), `NUMBER`, `BOOLEAN`, `DATE` (`yyyy-MM-dd`), `DATETIME` (`yyyy-MM-dd HH:mm:ss`). |
+| `required` | Si es `true` y el llamador lo omite (sin `defaultValue`), la llamada falla con `400`. |
+| `defaultValue` | Se usa cuando el llamador omite el parámetro. |
+| `position` | Orden de visualización en la UI de back office. |
+
+## Registrar una función
+
+Desde la página "Http Functions" del back office (una vez que `functions.ui` está en el classpath), o de forma programática:
+
+```java
+//demo/RegisterWhatsAppFunction.java
+package demo;
+
+import tools.dynamia.modules.functions.domain.DynamiaHttpFunction;
+import tools.dynamia.modules.functions.domain.DynamiaHttpFunctionParameter;
+import tools.dynamia.modules.functions.domain.enums.FunctionStatus;
+import org.springframework.http.HttpMethod;
+
+DynamiaHttpFunction function = new DynamiaHttpFunction();
+function.setName("WhatsApp.sendMessage");
+function.setFunctionVersion(1);
+function.setMethod(HttpMethod.POST);
+function.setUrl("https://api.whatsapp.example.com/v1/messages");
+function.setContentType("application/json");
+function.setBodyTemplate("{\"to\":\"${number}\",\"text\":\"${message}\"}");
+function.setHeaders("Authorization: Bearer ${apiToken}");
+function.setStatus(FunctionStatus.ACTIVE);
+
+DynamiaHttpFunctionParameter number = new DynamiaHttpFunctionParameter();
+number.setName("number");
+number.setRequired(true);
+function.addParameter(number);
+
+DynamiaHttpFunctionParameter message = new DynamiaHttpFunctionParameter();
+message.setName("message");
+message.setRequired(true);
+function.addParameter(message);
+
+crudService.create(function);
+```
+
+## Versionado
+
+El versionado es explícito y manual:
+
+- Las versiones empiezan en 1.
+- Una versión nueva debe ser estrictamente mayor que el máximo actual para ese `name`.
+- No se permiten combinaciones `(name, version)` duplicadas.
+- Por defecto, **se ejecuta la versión `ACTIVE` más alta**.
+- Se puede pedir una versión específica explícitamente sin importar su estado — útil para probar una versión `DRAFT` antes de promoverla.
+
+```java
+DynamiaFunctions.call("WhatsApp.sendMessage", params);      // versión ACTIVE más alta
+DynamiaFunctions.call("WhatsApp.sendMessage", 2, params);   // versión 2 explícita
+```
+
+Una vez creada, una versión se trata como inmutable por convención — se crea una versión nueva en lugar de editar una existente, de modo que los llamadores fijados a una versión nunca ven cambiar el comportamiento debajo de ellos.
+
+## Validación de parámetros y coerción de tipos
+
+Antes de la invocación, los parámetros declarados se comprueban contra el mapa `params` de la llamada:
+
+1. Los valores faltantes recurren a `defaultValue` cuando está declarado.
+2. Los parámetros **requeridos** que siguen faltando generan un error de validación → HTTP `400`.
+3. Los valores presentes se coaccionan al `type` declarado (un parámetro `NUMBER` acepta una cadena numérica y se parsea a `BigDecimal`); los valores que no se pueden coaccionar también generan `400`.
+
+## Llamar desde Java: `DynamiaFunctions`
+
+`DynamiaHttpFunctionsService` es el registro + motor de ejecución; `DynamiaFunctions` es la fachada estática pensada para el código de aplicación:
+
+```java
+// Versión ACTIVE más alta
+FunctionResult result = DynamiaFunctions.call("WhatsApp.sendMessage",
+        Map.of("number", "123456789", "message", "Hello"));
+
+// Versión específica
+FunctionResult v2 = DynamiaFunctions.call("WhatsApp.sendMessage", 2,
+        Map.of("number", "123456789", "message", "Hello"));
+
+// Autorregistra un placeholder DRAFT en lugar de lanzar FunctionNotFoundException
+// cuando la función aún no ha sido configurada
+FunctionResult draft = DynamiaFunctions.call("Invoicing.generatePdf",
+        Map.of("orderId", "123"), true);
+
+// No bloqueante (se ejecuta en un virtual thread)
+DynamiaFunctions.callAsync("WhatsApp.sendMessage", Map.of("number", "123", "message", "Hello"))
+        .thenAccept(r -> log.info("sent: " + r.isSuccess()));
+```
+
+`FunctionResult` envuelve datos estructurados o binarios:
+
+```java
+result.isSuccess();     // true/false
+result.isBinary();      // true cuando el payload son bytes crudos (imagen/PDF/CSV/...)
+result.isJson();        // true cuando getData() es un Map/List
+
+Map<String, Object> data = result.toJson();
+SendMessageResponse dto = result.toJson(SendMessageResponse.class);
+byte[] file = result.getBinaryData(); // cuando isBinary() == true
+```
+
+Las llamadas pueden lanzar `FunctionNotFoundException`, `FunctionInactiveException`, `ValidationError` (`tools.dynamia.domain`), o `FunctionExecutionException` (la llamada saliente falló — error de red, respuesta no 2xx). El controlador REST mapea estos casos a `404`, `400` y `500` respectivamente; desde Java, captura lo que sea relevante o deja que se propague.
+
+## API HTTP
+
+```
+POST /api/dynamia/fx/{functionName}
+```
+
+Selección opcional de versión mediante la cabecera `X-Dynamia-Version: 2` o el parámetro de consulta `?v=2`; sin ninguno de los dos, se ejecuta la última versión `ACTIVE`.
+
+```http
+POST /api/dynamia/fx/WhatsApp.sendMessage
+Content-Type: application/json
+
+{ "params": { "number": "123456789", "message": "Hello" } }
+```
+
+Respuesta JSON:
+
+```json
+{ "success": true, "data": { ... } }
+```
+
+Cuando el endpoint de destino devuelve una imagen/PDF/CSV/etc., los bytes crudos se transmiten de vuelta con el `Content-Type` correspondiente — sin sobre JSON, sin envoltura en base64. Los errores (validación, no encontrado, inactivo, fallo de ejecución) se devuelven así:
+
+```json
+{ "success": false, "error": "Parameter [number] is required" }
+```
+
+| Código | Significado |
+|---|---|
+| 200 | Éxito |
+| 400 | Error de validación (parámetro faltante/inválido) |
+| 401 | Autenticación requerida — delegado a la capa de seguridad de la app |
+| 403 | Fallo de autorización — delegado a la capa de seguridad de la app |
+| 404 | Función o versión no encontrada, o no `ACTIVE` |
+| 500 | Error interno de ejecución |
+
+## Probar una función sin salir del navegador
+
+Con `functions.ui` en el classpath, la página "Http Functions" del back office (aportada como un grupo de páginas sobre el módulo `saas` existente) lista todas las funciones registradas con CRUD de formulario/tabla tanto para `DynamiaHttpFunction` como para sus parámetros. Cada fila tiene una acción **Test** (`TestHttpFunctionAction`) que abre un diálogo para editar los parámetros de la llamada como JSON e invoca la función de inmediato a través de `DynamiaHttpFunctionsService`, mostrando el `FunctionResult` resultante — o el error de validación/ejecución — ahí mismo. Es la forma más rápida de verificar una definición antes de conectarla al código de la aplicación.
+
+## Principios de diseño
+
+- Resolución de versión determinista — gana la `ACTIVE` más alta salvo que se fije una versión explícitamente.
+- Contratos de versión inmutables — se crea una versión nueva en vez de editar una existente.
+- Separación clara entre metadata e implementación.
+- Semántica nativa de HTTP (códigos de estado, tipos de contenido) en lugar de un sobre personalizado para cada caso.
+- Extensible sin tocar los controladores del núcleo.
+
+## Casos de uso típicos
+
+- Enviar notificaciones de WhatsApp/SMS/email a través de un proveedor de terceros.
+- Generar reportes PDF u optimizar imágenes vía un microservicio interno.
+- Exportar archivos de datos (CSV, XLSX).
+- Integrar servicios de terceros cuyas credenciales/endpoints varían por entorno o tenant.
+- Disparar procesos de negocio internos expuestos como endpoints HTTP internos.
+
+<Aside type="caution">
+**Aún no implementado — elementos del roadmap, no construyas sobre esto hoy:**
+
+- 401/403 **no se aplican a nivel de función**. Asegurar quién puede llamar a `/api/dynamia/fx/{functionName}` actualmente está delegado por completo a la propia capa de seguridad de la aplicación (p. ej. reglas de Spring Security sobre el path base) — la extensión en sí no hace ninguna comprobación de autorización por función.
+- Los campos `interfaceName`/`methodName` ya existen en `DynamiaHttpFunction`, reservados para un futuro proxy dinámico de interfaz Java (invocar una función a través de un método de interfaz normal en lugar de `DynamiaFunctions.call(...)`), pero esto **no está implementado**.
+- Tampoco están implementados: metadata de deprecación, sugerencias automáticas de versión, métricas/observabilidad de ejecución, caché de respuestas, y un sandbox de ejecución basado en scripts.
+
+Trátalos como dirección planeada, no como capacidad actual.
+</Aside>
+
+## Relacionados
+
+<LinkButton href="/es/reference/quick-reference" variant="secondary">Referencia Rápida</LinkButton>
+<LinkButton href="/es/guides/actions" variant="secondary">Guía de Actions</LinkButton>
+<LinkButton href="/es/guides/development-patterns" variant="secondary">Patrones de Desarrollo</LinkButton>
+<LinkButton href="/es/key-concepts" variant="secondary">Conceptos Clave</LinkButton>

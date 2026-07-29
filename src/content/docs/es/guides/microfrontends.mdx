@@ -1,0 +1,192 @@
+---
+title: Incrustando Microfrontends
+description: Incrusta bundles JS externos (Vue, React, Svelte, JS plano) dentro de páginas ZK con el componente MicroFrontend y el paquete npm microfrontend-bridge.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+`tools.dynamia.zk.ui.MicroFrontend` (módulo `tools.dynamia.zk`) incrusta un bundle JS externo — Vue, React, Svelte o JS plano — dentro de una página ZUL. Se carga y cachea en el cliente, sin iframe, así que el bundle comparte el viewport de la página y, opcionalmente, su DOM/CSS. En el lado JS, el paquete npm `@dynamia-tools/microfrontend-bridge` le da a los autores del bundle una API pequeña y completamente tipada en lugar de inspeccionar props a mano.
+
+Este es un punto de integración real, ya usado en producción — útil cuando un equipo ya tiene una SPA independiente (un widget Vue, un dashboard React) y quieres exponerla dentro del back office sin reescribirla como componentes ZK.
+
+## Los tres modos de montaje
+
+`<microfrontend>` soporta tres formas de cederle el control al bundle:
+
+```xml
+<!-- 1. custom-element: el bundle registra un Web Component (p. ej. defineCustomElement de Vue) -->
+<microfrontend src="/bundles/my-app.js" css="/bundles/my-app.css" tag="my-vue-app"
+               userId="${user.id}"/>
+
+<!-- 2. mount-fn: estilo single-spa con window.mountFn(container, props) / unmountFn(container) -->
+<microfrontend src="/bundles/my-app.js" mode="mount-fn"
+               mountFn="mount" unmountFn="unmount" updateFn="update"/>
+
+<!-- 3. auto: un build de SPA autocontenida (build por defecto de `vite build`, no una librería de custom-element) -->
+<microfrontend app="/static/next/subscription"/>
+```
+
+- **`custom-element`** — el bundle define un Web Component (`tag="my-vue-app"`) y `MicroFrontend` lo instancia directamente, pasando cada atributo XML restante como una propiedad.
+- **`mount-fn`** — funciones de ciclo de vida al estilo single-spa (`mountFn`/`unmountFn`/`updateFn`) registradas en `window`. `MicroFrontend` llama a `mountFn(container, props)` una vez y a `updateFn(container, props)` en cambios posteriores que solo afectan props, en lugar de destruir y recrear todo.
+- **`auto`** — apunta `app=` a la raíz del build de producción de un bundler (p. ej. el `dist/` de Vite, copiado tal cual dentro de una carpeta estática). El navegador obtiene `{app}/index.html`, extrae las etiquetas `<script type="module">` y `<link rel="stylesheet">` de entrada — así nunca hace falta hardcodear nombres de archivo con hash — y, si el bundle se automonta en un selector fijo (`createApp(App).mount('#app')`), replica primero ese markup dentro del contenedor. El modo `auto` no tiene ningún canal de props: solo se soporta una instancia viva de un `app` dado a la vez, y `shadow="true"` no está soportado (el bundle busca su destino con un `document.getElementById()` a nivel de página).
+
+`shadow="true"` monta los bundles `custom-element`/`mount-fn` dentro de un shadow root, aislando CSS/DOM de la página anfitriona en ambas direcciones.
+
+### Data binding y actualización de props
+
+Cada atributo XML es una propiedad de bean plana, así que el binding MVVM de ZK funciona sin pegamento extra — incluido enlazar un objeto Java completo, que se serializa como JSON anidado real vía Jackson en lugar de `toString()`:
+
+```xml
+<microfrontend src="/bundles/my-app.js" tag="my-vue-app"
+               userId="@bind(vm.userId)" user="@bind(vm.currentUser)"
+               onMicrofrontendEvent="@command('handleEvent', data=event.data)"/>
+```
+
+Los cambios que solo afectan props — el caso común una vez enlazado vía `@bind` — actualizan la instancia montada en su lugar en vez de destruirla y recrearla, así que el bundle no pierde estado interno (un formulario a medio llenar, por ejemplo) en cada tick reactivo.
+
+## Comunicación servidor ↔ bundle
+
+El bundle montado recibe una función `dynamiaEmit(data)` en sus props para notificar al servidor:
+
+```js
+// dentro del bundle
+props.dynamiaEmit({ type: 'checkout', total: 42 });
+```
+
+```xml
+<microfrontend ... onMicrofrontendEvent="@command('handleCheckout', data=event.data)"/>
+```
+
+Dos eventos de ciclo de vida se disparan alrededor de cada montaje/actualización para que la página ZUL pueda manejar un estado de carga:
+
+```xml
+<microfrontend ... onMicrofrontendReady="@command('hideSpinner')"
+               onMicrofrontendError="@command('showRetry', message=event.data.message)"/>
+```
+
+`onMicrofrontendReady` se dispara una vez que el bundle se montó con éxito; `onMicrofrontendError` se dispara con un payload `{message}` si el montaje/actualización falla, para que puedas mostrar una opción de reintento en lugar de un panel en blanco.
+
+## Contexto del host: `dynamiaHost`
+
+Valores transversales — tenant, locale, URL base de la API, token de autenticación — no deberían cablearse a mano en cada tag `<microfrontend>`. En su lugar, registra uno o más beans `MicroFrontendHostContextProvider` en el servidor; sus resultados se combinan y se entregan como una prop `dynamiaHost` a **todos** los microfrontends montados:
+
+```java
+//demo/TenantHostContextProvider.java
+package demo;
+
+import org.springframework.stereotype.Component;
+import tools.dynamia.zk.ui.MicroFrontendHostContextProvider;
+
+import java.util.Map;
+
+@Component
+public class TenantHostContextProvider implements MicroFrontendHostContextProvider {
+
+    @Override
+    public Map<String, Object> getHostContext() {
+        Account account = AccountServiceAPI.getCurrentAccount();
+        return Map.of(
+            "tenantId", account.getId(),
+            "locale", LocaleUtils.getCurrentLocale().toLanguageTag(),
+            "apiBaseUrl", "/api"
+        );
+    }
+}
+```
+
+`dynamiaHost` no se entrega en modo `auto`, ya que ese modo no tiene ningún canal de props.
+
+## El paquete `@dynamia-tools/microfrontend-bridge`
+
+En lugar de inspeccionar `dynamiaEmit`/`dynamiaHost` a mano sobre `this` o `props`, instala el bridge:
+
+```bash
+npm install @dynamia-tools/microfrontend-bridge
+```
+
+No tiene dependencias en tiempo de ejecución y funciona con cualquier bundler/framework — solo toca objetos planos. Exporta exactamente tres funciones y dos tipos:
+
+- **`isDynamiaHost(target)`** — indica si `dynamiaEmit` fue realmente inyectado. `false` en desarrollo local/independiente, y siempre `false` en modo `auto` (sin canal de props).
+- **`emitToHost(target, data)`** — envía `data` de vuelta al servidor, disparando `onMicrofrontendEvent`. Nunca lanza excepción — no hace nada y emite un `console.warn` cuando no se ejecuta dentro de un host Dynamia, así el bundle sigue funcionando de forma independiente durante el desarrollo local.
+- **`getHostContext(target)`** — lee el contexto `dynamiaHost` combinado, o `{}` si no se registró ninguno.
+- **Tipos**: `DynamiaMicrofrontendProps`, `DynamiaHostContext`.
+
+En cada función, `target` es el objeto que realmente lleva las props: la instancia del custom element (`this`) en modo `custom-element`, o el argumento `props` en `mountFn`/`updateFn` del modo `mount-fn`.
+
+### Custom element (`defineCustomElement` de Vue)
+
+```ts
+import { defineCustomElement } from 'vue';
+import { emitToHost, getHostContext, type DynamiaMicrofrontendProps } from '@dynamia-tools/microfrontend-bridge';
+import App from './App.vue';
+
+const MyWidget = defineCustomElement({
+  props: ['userId'],
+  setup(props) {
+    // `this` dentro de los métodos de un defineCustomElement de Vue es la propia instancia
+    // del elemento, que es exactamente donde MicroFrontend asigna dynamiaEmit/dynamiaHost.
+    function notifyHost(data: unknown) {
+      emitToHost(this as unknown as DynamiaMicrofrontendProps, data);
+    }
+    const host = getHostContext(this as unknown as DynamiaMicrofrontendProps);
+    // ...usa props.userId, host.tenantId, host.locale, etc.
+  },
+});
+
+customElements.define('my-widget', MyWidget);
+```
+
+```xml
+<!-- lado ZUL -->
+<microfrontend src="/bundles/my-widget.js" tag="my-widget" userId="${user.id}"
+               onMicrofrontendEvent="@command('handleWidgetEvent', data=event.data)"/>
+```
+
+### `mount-fn` (estilo single-spa)
+
+```ts
+import { emitToHost, getHostContext, type DynamiaMicrofrontendProps } from '@dynamia-tools/microfrontend-bridge';
+
+window.mountMyApp = (container: HTMLElement, props: DynamiaMicrofrontendProps) => {
+  const host = getHostContext(props);
+  fetch(`${host.apiBaseUrl ?? '/api'}/things?tenant=${host.tenantId}`)
+    .then((res) => res.json())
+    .then((things) => render(container, things, () => emitToHost(props, { type: 'clicked' })));
+};
+
+window.updateMyApp = (container: HTMLElement, props: DynamiaMicrofrontendProps) => {
+  // se llama en vez de un desmontaje+montaje completo cuando solo cambiaron props
+  rerender(container, props);
+};
+
+window.unmountMyApp = (container: HTMLElement) => {
+  container.innerHTML = '';
+};
+```
+
+```xml
+<!-- lado ZUL -->
+<microfrontend src="/bundles/my-app.js" mode="mount-fn"
+               mountFn="mountMyApp" unmountFn="unmountMyApp" updateFn="updateMyApp"/>
+```
+
+<Aside type="tip">
+Una demo completa y funcional de los tres modos vive en el ejemplo `examples/demo-zk-books` del framework (Library → More Examples → MicroFrontend) en [GitHub](https://github.com/dynamiatools/framework).
+</Aside>
+
+## Cuándo usar esto vs. construir con ZK/actions nativos
+
+Si estás construyendo UI desde cero dentro de Dynamia Platform, prefiere las [Actions](/es/guides/actions) y los [View Descriptors](/es/view-descriptors) nativos — te dan binding de datos, permisos y CRUD gratis. Recurre a `MicroFrontend` cuando ya tienes un bundle independiente (un producto existente, un equipo en otro stack frontend, un widget de terceros) que quieres exponer dentro del back office sin reescribirlo.
+
+<CardGrid>
+  <Card title="Componente de servidor" icon="seti:java">
+    `tools.dynamia.zk.ui.MicroFrontend` — el tag ZUL `<microfrontend>`, los tres modos de montaje, la inyección de `dynamiaHost`.
+  </Card>
+  <Card title="SDK del lado del bundle" icon="seti:typescript">
+    `@dynamia-tools/microfrontend-bridge` — `isDynamiaHost`, `emitToHost`, `getHostContext`.
+  </Card>
+</CardGrid>
+
+---
+
+**Guías relacionadas:** [Conceptos Clave](/es/key-concepts) · [Cómo funcionan las Actions](/es/guides/actions) · [Patrones de Desarrollo](/es/guides/development-patterns) · [Referencia Rápida](/es/reference/quick-reference)

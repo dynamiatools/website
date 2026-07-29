@@ -1,0 +1,173 @@
+---
+title: CrudServiceListener
+description: Hooks de ciclo de vida que se disparan en cada create/update/delete sin importar el punto de entrada — CrudServiceListenerAdapter, @Listener, y cuándo usar un listener en vez de un @Service.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Un método `@Service` se ejecuta cuando algo lo llama. Un `CrudServiceListener` se ejecuta cada vez
+que `CrudService` realiza la operación correspondiente sobre la entidad — sin importar si quien
+llama es tu servicio, un controlador REST, un job de importación por lotes, o la UI CRUD genérica.
+Esa diferencia es la razón de ser completa de este punto de extensión.
+
+## La interfaz
+
+```java
+package tools.dynamia.domain.util;
+
+public interface CrudServiceListener<T> {
+    default void beforeCreate(T entity) {}
+    default void afterCreate(T entity) {}
+    default void beforeUpdate(T entity) {}
+    default void afterUpdate(T entity) {}
+    default void beforeDelete(T entity) {}
+    default void afterDelete(T entity) {}
+    default void beforeQuery(QueryParameters params) {}
+    default void afterQuery(List<T> result) {}
+}
+```
+
+Los ocho métodos son no-ops por defecto, así que `CrudServiceListenerAdapter<T>`
+(`tools.dynamia.domain.util.CrudServiceListenerAdapter`) existe únicamente para que solo tengas que
+sobrescribir lo que necesitas:
+
+```java
+//mybookstore/listeners/InvoiceCrudListener.java
+package mybookstore.listeners;
+
+import mybookstore.domain.Invoice;
+import tools.dynamia.domain.util.CrudServiceListenerAdapter;
+import tools.dynamia.integration.sterotypes.Listener;
+
+@Listener
+public class InvoiceCrudListener extends CrudServiceListenerAdapter<Invoice> {
+
+    @Override
+    public void beforeCreate(Invoice entity) {
+        entity.calcTotal();
+    }
+
+    @Override
+    public void beforeUpdate(Invoice entity) {
+        entity.calcTotal();
+    }
+}
+```
+
+`@Listener` (`tools.dynamia.integration.sterotypes.Listener`) es un alias de `@Component` de
+Spring — un `@Component` normal funciona de forma idéntica, `@Listener` solo documenta la
+intención.
+
+## Cómo funciona realmente el despacho
+
+`JpaCrudService` recolecta **todos** los beans `CrudServiceListener` del contexto y llama al método
+correspondiente en **todos ellos**, para **todos** los tipos de entidad, en cada
+create/update/delete:
+
+```java
+for (CrudServiceListener listener : listeners) {
+    try {
+        switch (type) {
+            case BEFORE_CREATE -> listener.beforeCreate(value);
+            // ...
+        }
+    } catch (ClassCastException e) {
+        // Se ignora — es esperado para listeners tipados a otra entidad
+    }
+}
+```
+
+No hay filtrado por clase de entidad antes de la llamada. Lo que realmente restringe un
+`CrudServiceListenerAdapter<Invoice>` a los eventos de `Invoice` son los genéricos de Java: el
+compilador emite un método puente sintético que castea el `Object` entrante a `Invoice` antes de
+delegar en tu `beforeCreate(Invoice)` sobrescrito. Cuando se crea un `Book`, ese cast lanza
+`ClassCastException` dentro del puente — el framework la captura y la ignora en silencio. No
+necesitas (ni deberías agregar) una comprobación `instanceof` dentro de tu listener; el parámetro
+de tipo ya hace el filtrado.
+
+<Aside type="caution">
+Como cada bean listener se invoca para el create/update/delete de cada entidad, mantén los
+listeners no relacionados numerosos-pero-baratos en lugar de escribir un único listener gigante con
+ramificación interna `instanceof` para varios tipos de entidad — el costo por llamada de una
+`ClassCastException` capturada para tipos que no coinciden es pequeño, pero un solo listener
+manejando en silencio cinco entidades no relacionadas es un problema de legibilidad y
+testabilidad, no de rendimiento.
+</Aside>
+
+## Prevenir transiciones de estado inválidas
+
+`beforeDelete`/`beforeUpdate` pueden lanzar `ValidationError` para abortar la operación — el mismo
+tipo de error que lanza un [`Validator`](/es/guides/validators), así que se muestra de la misma
+forma en la UI:
+
+```java
+//mybookstore/listeners/BookAuditListener.java
+package mybookstore.listeners;
+
+import mybookstore.domain.Book;
+import org.springframework.context.ApplicationEventPublisher;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.util.CrudServiceListenerAdapter;
+import tools.dynamia.integration.sterotypes.Listener;
+
+@Listener
+public class BookAuditListener extends CrudServiceListenerAdapter<Book> {
+
+    private final ApplicationEventPublisher eventPublisher;
+
+    public BookAuditListener(ApplicationEventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Override
+    public void afterCreate(Book book) {
+        eventPublisher.publishEvent(new BookCreatedEvent(book));
+    }
+
+    @Override
+    public void beforeDelete(Book book) {
+        if (hasActiveInvoices(book)) {
+            throw new ValidationError("Cannot delete a book that appears in invoices.");
+        }
+    }
+
+    private boolean hasActiveInvoices(Book book) {
+        // consulta en la base de datos
+        return false;
+    }
+}
+```
+
+## Listener vs. `Validator` vs. `@Service`
+
+| Preocupación | Dónde pertenece |
+|---|---|
+| Rechazar entrada inválida con un error direccionable a un campo | [`Validator&lt;T&gt;`](/es/guides/validators) |
+| Valor derivado / efecto secundario que debe aplicarse en *cada* create, update o delete — sin importar qué llamó a `CrudService` | `CrudServiceListener` |
+| Un flujo de negocio explícito al que el llamador se suscribe voluntariamente (aprobar una orden, enviar un reporte) | Método `@Service` |
+
+La pregunta decisiva para elegir entre listener y servicio: **"si alguien evita mi servicio y llama
+directamente a `CrudService.save()` (desde un controlador REST, un script, el formulario CRUD
+genérico), ¿esto igual necesita ocurrir?"** Si la respuesta es sí, es un listener — un método de
+servicio solo se ejecuta cuando se llama explícitamente, un listener se ejecuta sin importar por
+qué puerta entró la entidad. Que `InvoiceCrudListener` recalcule `total` en cada guardado es el
+caso modelo: el total de una factura nunca debe quedar desactualizado, sin importar qué camino de
+código modificó sus líneas.
+
+<CardGrid>
+  <Card title="Invariante global" icon="approve-check">
+    Recálculo de `total`, pista de auditoría, contadores desnormalizados — siempre correctos, en todas partes.
+  </Card>
+  <Card title="Flujo explícito" icon="rocket">
+    "Aprobar esta orden" es una acción deliberada que un usuario o llamador de API dispara — eso es
+    un método `@Service` (invocado desde una [Action](/es/guides/actions) o un controlador), no un
+    listener.
+  </Card>
+</CardGrid>
+
+## Relacionados
+
+- [Validators](/es/guides/validators) — rechazar datos inválidos antes de que se consideren siquiera para persistencia.
+- [CrudService](/es/guides/crud-service) — la API a cuyas operaciones se enganchan estos hooks.
+- [Actions](/es/guides/actions) — operaciones explícitas, disparadas por el usuario, en contraste con hooks siempre activos.
+- [Referencia Rápida](/es/reference/quick-reference) — resumen condensado de listeners.

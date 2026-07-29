@@ -1,0 +1,127 @@
+---
+title: Plantillas y Temas
+description: Cómo funciona el shell de UI conectable de Dynamia Platform, y theme-dynamical — el tema de referencia Bootstrap 5 / AdminLTE con 10 skins.
+---
+
+import { Card, CardGrid, Aside, LinkButton } from '@astrojs/starlight/components';
+
+Cada pantalla que DynamiaTools genera automáticamente a partir de un [descriptor de vista](/es/view-descriptors) — formularios, tablas, la barra de navegación, la pantalla de login — se renderiza dentro de una **plantilla (template)**: una dependencia Maven/Gradle que provee el shell HTML, el CSS y los componentes ZK alrededor de tu contenido. Cambiar la plantilla cambia el aspecto de toda la aplicación sin tocar un solo descriptor de vista ni entidad.
+
+<Aside type="note" title="Un solo tema por ahora">
+  El sistema de plantillas es conectable por diseño, pero **`theme-dynamical` es actualmente el único tema que Dynamia Platform incluye**. Todavía no hay una galería de temas alternativos entre los cuales elegir — piensa en esta página como la documentación de la implementación de referencia, no como una elección entre opciones.
+</Aside>
+
+## Cómo funciona la selección de plantilla
+
+Una plantilla se selecciona con dos propiedades de Spring Boot bajo el prefijo `dynamia.app` — el mismo grupo de propiedades que usa la [guía de Comenzando](/es/getting-started) para `name`, `default-logo` y similares:
+
+```yaml
+# application.yml
+dynamia:
+  app:
+    template: Dynamical
+    default-skin: Blue
+```
+
+- **`dynamia.app.template`** — el nombre del bean de plantilla instalado (`Dynamical` para `theme-dynamical`)
+- **`dynamia.app.default-skin`** — qué skin de color renderiza la plantilla por defecto
+
+Nada más en tu aplicación cambia: las entidades, los `ModuleProvider` y los descriptores de vista son agnósticos a la plantilla. La plantilla solo controla el layout, el CSS y el "chrome" alrededor de tus páginas.
+
+## theme-dynamical
+
+`theme-dynamical` es la plantilla de referencia (y, por ahora, la única) de Dynamia Platform. Está construida sobre [AdminLTE](https://adminlte.io/) — una plantilla de panel de administración gratuita con licencia MIT — corriendo sobre **Bootstrap 5** y optimizada específicamente para **ZK 10.x**.
+
+<CardGrid>
+  <Card title="10 skins" icon="star">
+    Blue, Dynamia, Red, Orange, Purple, Green, DarkOrange, Yellow, Olive, Black — cambia con una sola propiedad, sin rebuild.
+  </Card>
+  <Card title="UI de login y perfil" icon="approve-check-circle">
+    Incluye pantallas de login y perfil de usuario ya listas, en lugar de dejarte construirlas.
+  </Card>
+  <Card title="UI multi-pestaña" icon="list-format">
+    Abre páginas en pestañas dentro del shell, para que los usuarios puedan trabajar en varias entidades sin perder contexto.
+  </Card>
+  <Card title="Totalmente responsivo" icon="laptop">
+    Se adapta desde dispositivos móviles pequeños hasta pantallas de escritorio grandes — los mismos descriptores se renderizan correctamente en cualquier tamaño.
+  </Card>
+</CardGrid>
+
+También soporta un logo e ícono personalizados de la app (las propiedades `dynamia.app.default-logo` / `dynamia.app.default-icon` de la guía de Comenzando), y se mantiene deliberadamente compacto.
+
+### Instalación
+
+**Maven**
+
+```xml
+<dependency>
+  <groupId>tools.dynamia.themes</groupId>
+  <artifactId>tools.dynamia.themes.dynamical</artifactId>
+  <version>5.4.0</version>
+</dependency>
+```
+
+**Gradle**
+
+```groovy
+compile 'tools.dynamia.themes:tools.dynamia.themes.dynamical:5.4.0'
+```
+
+<Aside type="tip">
+  Los proyectos generados con el <a href="/es/ecosystem/cli">CLI</a> (`dynamia new`) ya incluyen `theme-dynamical` en el classpath — solo necesitas agregar esta dependencia manualmente si partiste de un proyecto Spring Initializr sencillo, según la guía de <a href="/es/getting-started">Comenzando</a>.
+</Aside>
+
+### Configuración
+
+```yaml
+# application.yml
+dynamia:
+  app:
+    template: Dynamical
+    default-skin: Blue
+```
+
+O en `application.properties`:
+
+```properties
+dynamia.app.template=Dynamical
+dynamia.app.default-skin=Blue
+```
+
+### Skins disponibles
+
+Establece `default-skin` con cualquiera de estos valores:
+
+- Blue
+- Dynamia
+- Red
+- Orange
+- Purple
+- Green
+- DarkOrange
+- Yellow
+- Olive
+- Black
+
+Cambiar el skin es un cambio puramente de configuración — no hay CSS que escribir, ni rebuild de la plantilla misma.
+
+## Hacia dónde seguir
+
+<CardGrid>
+  <Card title="Comenzando" icon="rocket">
+    Mira la plantilla Dynamical funcionando en un proyecto recién generado, incluyendo el recorrido de responsividad y branding personalizado.
+    <LinkButton href="/es/getting-started" variant="minimal">Comenzando →</LinkButton>
+  </Card>
+  <Card title="CLI" icon="seti:powershell">
+    Crea un nuevo backend que ya tiene theme-dynamical conectado, mediante el asistente `dynamia new`.
+    <LinkButton href="/es/ecosystem/cli" variant="minimal">CLI →</LinkButton>
+  </Card>
+  <Card title="Referencia Rápida" icon="document">
+    Cheat-sheet de las propiedades, stereotypes y sintaxis de descriptores que usarás junto a un tema.
+    <LinkButton href="/es/reference/quick-reference" variant="minimal">Referencia Rápida →</LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+Fuente: [github.com/dynamiatools/theme-dynamical](https://github.com/dynamiatools/theme-dynamical) · Licencia Apache 2.0

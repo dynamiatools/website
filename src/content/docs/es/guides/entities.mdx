@@ -1,0 +1,171 @@
+---
+title: Entidades
+description: Cómo funcionan las entidades JPA en Dynamia Platform — BaseEntity, campos de auditoría, toString() para pickers, convenciones de relaciones/cascada y campos transitorios solo para la UI.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Las entidades son la capa de dominio: clases JPA planas sobre las que `CrudService`, la UI CRUD y
+el motor de descriptores de vista operan sin ningún cableado extra. El único requisito para
+obtener eso gratis es extender `tools.dynamia.domain.jpa.BaseEntity` — todo lo demás es
+`jakarta.persistence` estándar.
+
+## `BaseEntity`: lo que obtienes gratis
+
+`BaseEntity` está en la base de una pequeña jerarquía (`SimpleEntity` → `BaseEntityWithJavaTimes`
+→ `BaseEntity`) y aporta dos cosas: la estrategia de identidad y el registro de auditoría.
+
+```java
+//mybookstore/domain/Book.java
+package mybookstore.domain;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import tools.dynamia.domain.jpa.BaseEntity;
+
+@Entity
+@Table(name = "books")
+@OrderBy("title")                        // default ordering in listings
+public class Book extends BaseEntity {
+
+    @NotNull
+    private String title;
+
+    @ManyToOne
+    private Category category;
+
+    // getters/setters
+}
+```
+
+| Campo | Tipo | Gestionado por |
+|---|---|---|
+| `id` | `Long`, `@GeneratedValue(IDENTITY)` | Se establece al insertar |
+| `version` | `int`, `@Version` | Bloqueo optimista, se incrementa en cada actualización |
+| `creationDate` / `creationTime` / `creationTimestamp` | `LocalDate` / `LocalTime` / `LocalDateTime` | Se establece una sola vez, en el primer guardado |
+| `creator` | `String` (username) | Se establece una sola vez, en el primer guardado |
+| `lastUpdate` | `LocalDateTime` | Se actualiza en cada guardado |
+| `lastUpdater` | `String` (username) | Se actualiza en cada guardado |
+| `remoteId` | `Long` | Opcional, para entidades sincronizadas desde un sistema externo |
+
+<Aside type="note">
+`creator`/`lastUpdater` son el **username del usuario actuante como `String`**, no una relación
+`@ManyToOne` a una entidad `User` — no agregues una relación redundante `createdBy` a menos que
+específicamente necesites hacer join contra la tabla de usuarios.
+</Aside>
+
+Nunca estableces ninguno de estos campos a mano — `JpaCrudService` los completa alrededor de
+`create`/`save`/`update`. Si necesitas retrofechar un registro migrado, `BaseEntity` expone
+`resetCreationDate(LocalDateTime)` justo para eso.
+
+## Sobrescribe siempre `toString()`
+
+En cada lugar donde el framework necesita una etiqueta legible para una instancia de entidad —
+combo boxes, popups de `entitypicker`, celdas de `entityreflabel`, breadcrumbs en un `coollabel` —
+recurre a `toString()`. Si te saltas la sobrescritura, tus usuarios verán `Book@3f9a1c2` en cada
+picker.
+
+```java
+@Override
+public String toString() {
+    return title;
+}
+```
+
+Para entidades sin un campo de despliegue obvio, compón uno (`lastName + ", " + firstName`), pero
+mantenlo corto — se renderiza en línea dentro de dropdowns y resultados de búsqueda.
+
+## Relaciones y convenciones de cascada
+
+La regla general: **aplica cascade y orphan-remove a los hijos que no tienen sentido sin su
+padre**; deja en paz las referencias a entidades independientes.
+
+```java
+//mybookstore/domain/Book.java
+@Entity
+@Table(name = "books")
+public class Book extends BaseEntity {
+
+    @ManyToOne                                // independent entity: no cascade
+    private Category category;
+
+    @OneToMany(mappedBy = "book", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<BookReview> reviews = new ArrayList<>();   // dependent: dies with the book
+
+    @OneToOne
+    private EntityFile bookCover;             // file attachment, from the entity-files extension
+
+    @Override
+    public String toString() { return title; }
+}
+```
+
+- Inicializa las colecciones en la declaración (`= new ArrayList<>()`) — nunca dejes un
+  `@OneToMany` en null.
+- `@ManyToOne` es eager por defecto en JPA; eso está bien para lookups livianos como `Category`,
+  pero cuidado con el N+1 cuando una tabla renderiza muchas filas y cada una trae una asociación
+  más pesada — usa una proyección o `queryProjection: true` en el descriptor `crud`/`table` en vez
+  de pelear con los fetch types campo por campo.
+- `@Enumerated(EnumType.STRING)` — nunca dejes un `@Enumerated` sin `EnumType.STRING` en una
+  entidad nueva. El almacenamiento ordinal corrompe silenciosamente los datos en el momento en que
+  alguien reordena o inserta una constante del enum.
+- Los archivos adjuntos pasan por `EntityFile` (`tools.dynamia.modules.entityfile`, `@OneToOne`),
+  no por una columna `byte[]` cruda — eso te da abstracción del backend de almacenamiento y los
+  componentes de vista `entityfileImage` / `imageOnly` gratis.
+
+## Campos `@Transient` para estado solo de UI
+
+Las entidades frecuentemente necesitan un poco de estado que existe únicamente para la vista
+actual — un checkbox en una fila de tabla, una bandera calculada — y que nunca debe llegar a la
+base de datos ni a un payload JSON.
+
+```java
+@Transient
+@JsonIgnore
+private boolean selected;   // bound to a checkbox column, never persisted
+
+public boolean isSelected() { return selected; }
+public void setSelected(boolean selected) { this.selected = selected; }
+```
+
+`@Transient` (de `jakarta.persistence`) evita que Hibernate mapee el campo; `@JsonIgnore`
+(Jackson) lo mantiene fuera de las respuestas REST/API. Usa ambos juntos a menos que
+deliberadamente quieras que el campo se serialice.
+
+## La lógica de negocio pertenece a la entidad — hasta cierto punto
+
+Una entidad no es una bolsa anémica de getters y setters. Las transiciones de estado
+autocontenidas que no necesitan un colaborador son métodos de entidad legítimos:
+
+```java
+public boolean isOnSale() {
+    return onSale && salePrice != null;
+}
+
+public void markSoldOut() {
+    this.stockStatus = StockStatus.OUT_OF_STOCK;
+}
+```
+
+El límite: **en el momento en que un método necesita un bean de Spring inyectado (email, otro
+servicio, una consulta), ya no pertenece a la entidad.** Las entidades nunca son beans de Spring
+y no pueden inyectarse por constructor — esa lógica se traslada a un `@Service`. Consulta
+[Patrones de Desarrollo](/es/guides/development-patterns) para profundizar en los anti-patrones de
+entidad anémica y lógica de negocio.
+
+<CardGrid>
+  <Card title="Reglas cruzadas de campos/BD" icon="approve-check">
+    Pertenecen a un [`Validator&lt;T&gt;`](/es/guides/validators), no a `@PrePersist`/`@PreUpdate`.
+  </Card>
+  <Card title="Efectos secundarios de ciclo de vida" icon="setting">
+    Los cálculos recurrentes que deben ejecutarse en cada create/update sin importar quién llama
+    van en un [`CrudServiceListener`](/es/guides/crud-listeners).
+  </Card>
+</CardGrid>
+
+## Relacionado
+
+- [CrudService](/es/guides/crud-service) — la API de persistencia a través de la cual se leen/escriben las entidades.
+- [Validators](/es/guides/validators) — validación de reglas de negocio antes de guardar una entidad.
+- [View Descriptors](/es/view-descriptors) — cómo se mapean los campos de la entidad a formularios y tablas.
+- [Referencia Rápida](/es/reference/quick-reference) — hoja de referencia condensada de convenciones de entidades.

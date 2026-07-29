@@ -1,0 +1,184 @@
+---
+title: Converters
+description: Formatear valores en tablas y formularios con la librería incorporada converters.*, cómo escribir un converter propio y cómo conectarlo desde params.converter de un view descriptor.
+---
+
+import { Aside, Card, CardGrid } from '@astrojs/starlight/components';
+
+Un [view descriptor](/es/view-descriptors) permite que un campo `table`/`entityfilters`/`export`
+declare `params.converter: converters.Currency` para controlar cómo se renderiza un valor crudo.
+Ese nombre corto `converters.X` se resuelve a una clase en `tools.dynamia.zk.converters` — esta
+guía cubre los converters incorporados, cómo escribir el tuyo propio, y cómo funciona realmente la
+resolución para que un converter personalizado no falle en silencio al cargar.
+
+<Aside type="note">
+Dynamia Platform tiene **dos** conceptos de converter distintos que comparten nombre pero resuelven
+problemas diferentes. Esta guía trata sobre el **converter de vista/binding** usado por
+`params.converter` en YAML. El [segundo](#el-otro-converter-conversión-genérica-tipostring) es un
+puente de más bajo nivel entre string y objeto, sin relación con el renderizado — se cubre al final
+para que no se confundan los dos.
+</Aside>
+
+## Converters incorporados
+
+Viven en `tools.dynamia.zk.converters` y se referencian por su nombre corto:
+
+| Converter | Descripción |
+|---|---|
+| `converters.Currency` | Formato de moneda con símbolo, usando el locale de la petición |
+| `converters.CurrencySimple` | Monto en moneda sin el símbolo |
+| `converters.Decimal` | Número decimal con separadores de miles |
+| `converters.Percent` | Formatea un valor numérico como porcentaje |
+| `converters.Date` | Solo fecha, delega en `LocalDate` |
+| `converters.DateTime` / `converters.LocalDateTime` | Fecha y hora |
+| `converters.LocalTime` / `converters.LocalTime12` / `converters.Time` | Formatos de solo hora |
+| `converters.Month` | Nombre del mes |
+| `converters.Duration` / `converters.Millis` | Formatos de tiempo transcurrido |
+| `converters.LongDate` | Fecha en formato largo (milisegundos de `java.util.Date`) |
+| `converters.Integer` / `converters.Double` | Coerción numérica sin formato |
+| `converters.Mustache` | Renderiza una plantilla Mustache contra la fila |
+
+```yaml
+# BookTable.yml
+fields:
+  price:
+    params:
+      converter: converters.Currency
+      header: { align: right }
+  publishDate:
+    params:
+      converter: converters.Date
+```
+
+## Escribir un converter personalizado
+
+Un converter de vista implementa el `Converter<UI_TYPE, BEAN_TYPE, Component>` de binding de ZK —
+la misma interfaz que usan los incorporados — con dos métodos: `coerceToUi` (valor del bean → lo
+que muestra el componente) y `coerceToBean` (valor del componente → lo que se escribe de vuelta en
+la entidad).
+
+```java
+//mybookstore/converters/WeightConverter.java
+package mybookstore.converters;
+
+import org.zkoss.bind.BindContext;
+import org.zkoss.bind.Converter;
+import org.zkoss.zk.ui.Component;
+
+import java.math.BigDecimal;
+
+public class WeightConverter implements Converter<Object, Object, Component> {
+
+    @Override
+    public Object coerceToUi(Object beanValue, Component comp, BindContext ctx) {
+        if (beanValue instanceof BigDecimal grams) {
+            return grams.divide(BigDecimal.valueOf(1000)) + " kg";
+        }
+        return null;
+    }
+
+    @Override
+    public Object coerceToBean(Object uiValue, Component comp, BindContext ctx) {
+        if (uiValue instanceof String s) {
+            return new BigDecimal(s.replace(" kg", "")).multiply(BigDecimal.valueOf(1000));
+        }
+        return null;
+    }
+}
+```
+
+Conéctalo desde el descriptor con el **nombre de clase totalmente calificado** — no con el atajo
+`converters.`:
+
+```yaml
+# BookTable.yml
+fields:
+  weightGrams:
+    label: Weight
+    params:
+      converter: mybookstore.converters.WeightConverter
+```
+
+<Aside type="caution">
+El prefijo `converters.` no es un alias de paquete genérico — el renderer lo reescribe literalmente
+a `tools.dynamia.zk.converters.<name>` antes de instanciar la clase. Solo se resuelve dentro de ese
+paquete del framework. Tus propios converters siempre deben referenciarse por su nombre de clase
+completo; no se requiere ninguna anotación de registro, del mismo modo en que las clases
+[`ViewCustomizer`](/es/guides/view-customizers) se instancian directamente por nombre desde YAML.
+</Aside>
+
+Los converters suelen ser de solo lectura en la mayoría de los casos (tablas), así que
+`coerceToBean` puede quedar como no-op (`return null;`) si el campo nunca se edita a través de este
+componente — impleméntalo por completo solo para converters usados en campos editables/de edición
+en línea o inputs de formulario.
+
+## El "otro" converter: conversión genérica tipo↔string
+
+Separado del renderizado de vista, `tools.dynamia.io.converters.Converter<T>` es un puente simple
+entre string y objeto, usado internamente para cosas como valores de configuración e
+importación/exportación de datos:
+
+```java
+public interface Converter<T> {
+    Class<T> getTargetClass();
+    String toString(T value);
+    T toObject(String value);
+}
+```
+
+Los incorporados (`DateConverter`, `BooleanConverter`, `BigDecimalConverter`, ...) se registran a
+sí mismos como beans de Spring normales con `@Provider`, y se buscan por clase de destino a través
+del utilitario `Converters`:
+
+```java
+//mybookstore/converters/WeightTextConverter.java
+package mybookstore.converters;
+
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.io.converters.Converter;
+
+import java.math.BigDecimal;
+
+@Provider
+public class WeightTextConverter implements Converter<BigDecimal> {
+
+    @Override
+    public Class<BigDecimal> getTargetClass() {
+        return BigDecimal.class;
+    }
+
+    @Override
+    public String toString(BigDecimal value) {
+        return value.toPlainString();
+    }
+
+    @Override
+    public BigDecimal toObject(String value) {
+        return new BigDecimal(value);
+    }
+}
+```
+
+```java
+String text = Converters.convert(weight);                 // BigDecimal -> String
+BigDecimal weight = Converters.convert(BigDecimal.class, "42.5");  // String -> BigDecimal
+```
+
+Recurrirás a este mucho menos a menudo que a un converter de vista — principalmente cuando
+necesites que la misma lógica string↔objeto funcione fuera de cualquier componente de UI (una
+importación CSV, un parámetro de configuración).
+
+<CardGrid>
+  <Card title="Converter de vista" icon="laptop">
+    `org.zkoss.bind.Converter&lt;UI,BEAN,Component&gt;` — `params.converter` en YAML, sin anotación, referenciado por nombre de clase.
+  </Card>
+  <Card title="Converter de tipo" icon="setting">
+    `tools.dynamia.io.converters.Converter&lt;T&gt;` — bean `@Provider`, se busca por clase de destino a través de `Converters`.
+  </Card>
+</CardGrid>
+
+## Relacionados
+
+- [View Descriptors](/es/view-descriptors) — la referencia completa de `params.converter` y la sintaxis de campos table/export.
+- [View Customizers](/es/guides/view-customizers) — el punto de extensión hermano, para comportamiento en lugar de formato.
+- [Referencia Rápida](/es/reference/quick-reference) — resumen condensado de YAML de view descriptors.

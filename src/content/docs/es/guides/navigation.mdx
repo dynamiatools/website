@@ -1,0 +1,224 @@
+---
+title: Navegación
+description: Profundiza en Module, PageGroup, Page, CrudPage y ExternalPage — registro con ModuleProvider, la API fluida del builder, orden, iconos y rutas virtuales.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+[Conceptos Clave](/es/key-concepts) presenta Module/Page/Navigation de un vistazo. Esta guía va
+más allá: múltiples módulos en una sola app, grupos de páginas y su orden, la API fluida
+compartida que hereda cada elemento de navegación, `JavaModuleBuilder`, y cómo se resuelven las
+rutas virtuales hasta llegar a una `Page`.
+
+## La jerarquía
+
+```
+Module (p. ej. "CRM")
+├── PageGroup (p. ej. "Sales")
+│   ├── CrudPage (p. ej. "Orders")
+│   └── CrudPage (p. ej. "Invoices")
+├── PageGroup (p. ej. "Customers")
+│   └── CrudPage (p. ej. "Contacts")
+└── Page (agregada sin grupo — cae en el page group por defecto del módulo)
+```
+
+`Module`, `PageGroup`, `Page`, `CrudPage` y `ExternalPage` extienden todas
+`NavigationElement<T>` — de ahí viene la API fluida y encadenable compartida (`.icon()`,
+`.description()`, `.position()`, y más), así que se comporta igual sin importar cuál de las
+cinco clases estés configurando.
+
+## `ModuleProvider` y `@Provider`
+
+Un módulo se registra implementando `ModuleProvider` y exponiéndolo como bean de Spring —
+`@Provider` (`tools.dynamia.integration.sterotypes.Provider`, un alias de `@Component`) es la
+opción idiomática, pero un `@Component` plano funciona igual. El framework escanea el contexto al
+arrancar y registra cada `ModuleProvider` que encuentra; **olvidar la anotación es la razón más
+común por la que un módulo simplemente no aparece en la navegación.**
+
+```java
+//mybookstore/providers/MyBookStoreModuleProvider.java
+package mybookstore.providers;
+
+import mybookstore.domain.*;
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.navigation.*;
+
+@Provider
+public class MyBookStoreModuleProvider implements ModuleProvider {
+
+    @Override
+    public Module getModule() {
+        return new Module("library", "Library")
+                .icon("book")
+                .description("Book inventory and sales")
+                .position(0)
+                .addPage(
+                        new CrudPage("books", "Books", Book.class),
+                        new CrudPage("categories", "Categories", Category.class).icon("tree"),
+                        new CrudPage("invoices", "Invoices", Invoice.class)
+                )
+                .addPageGroup(new PageGroup("reports", "Reports")
+                        .addPage(
+                                new Page("sales-report", "Sales Report", "classpath:/pages/sales-report.zul"),
+                                new ExternalPage("docs", "Documentation", "https://dynamia.tools")
+                        )
+                );
+    }
+}
+```
+
+`Module.addPage(...)` sin un grupo explícito hace que las páginas caigan en el **page group por
+defecto** del módulo (`module.getDefaultPageGroup()`) — así es como `books`/`categories`/`invoices`
+arriba aparecen sin que tengas que crear nunca un `PageGroup` para ellas. Usa un `PageGroup`
+explícito solo cuando quieras una subsección etiquetada en el menú.
+
+## Múltiples módulos en una misma aplicación
+
+Nada ata el registro de módulos a una sola clase — una aplicación real típicamente tiene un
+`ModuleProvider` por área funcional, cada uno descubierto de forma independiente:
+
+```java
+//mybookstore/providers/SettingsModuleProvider.java
+package mybookstore.providers;
+
+import mybookstore.domain.Category;
+import tools.dynamia.crud.CrudPage;
+import tools.dynamia.integration.sterotypes.Provider;
+import tools.dynamia.navigation.Module;
+import tools.dynamia.navigation.ModuleProvider;
+
+@Provider
+public class SettingsModuleProvider implements ModuleProvider {
+
+    @Override
+    public Module getModule() {
+        return new Module("settings", "Settings")
+                .icon("cog")
+                .position(100)                              // se renderiza después de "library" (position 0)
+                .addPage(new CrudPage("categories", "Book Categories", Category.class));
+    }
+}
+```
+
+Los beans `ModuleProvider` pueden recibir colaboradores inyectados por constructor como cualquier
+otro componente de Spring — un patrón común es variar qué páginas se agregan según las
+características habilitadas del tenant actual o los permisos del usuario, evaluado una sola vez
+al llamar `getModule()`.
+
+## Grupos de páginas y orden
+
+`position` es un `double`, no un entero — eso es deliberado: te permite insertar una página entre
+dos existentes (`1.5` entre `1` y `2`) sin renumerar todo el módulo cuando llega un nuevo
+requerimiento.
+
+```java
+PageGroup contacts = new PageGroup("contacts-group", "Contacts").position(1);
+contacts.addPage(new CrudPage("contacts", "All Contacts", Contact.class).position(1));
+contacts.addPage(new CrudPage("companies", "Companies", Company.class).position(2));
+```
+
+`NavigationElement<T>` expone el mismo conjunto de setters encadenables a cada elemento del árbol:
+
+| Método | Efecto |
+|---|---|
+| `.icon(name)` / `.iconSize("SMALL"\|"NORMAL"\|"LARGE")` | Icono del menú y su tamaño |
+| `.position(double)` | Orden dentro del padre |
+| `.description(text)` | Tooltip / texto secundario |
+| `.visible(boolean)` / `.enable(boolean)` | Ocultar por completo vs. mostrar pero deshabilitado |
+| `.badge(text)` | Contador/etiqueta pequeña superpuesta (p. ej. conteo de no leídos) |
+| `.renderOnUserRoles(roles)` | Restringe el elemento en el menú por rol |
+| `.alwaysAllowed(boolean)` | Omite las verificaciones de permisos para este elemento |
+| `.customLabel(text)` / `.customLabelSupplier(supplier)` | Sobrescribe la etiqueta renderizada, de forma estática o dinámica |
+
+Como cada uno de estos métodos devuelve `T` (el subtipo concreto), los encadenamientos se leen de
+forma natural sin importar qué clase estés construyendo:
+
+```java
+new CrudPage("invoices", "Invoices", Invoice.class)
+        .icon("receipt")
+        .position(3)
+        .badge("new")
+        .renderOnUserRoles("SALES,ADMIN");
+```
+
+## `CrudPage`, `Page` y `ExternalPage`
+
+`CrudPage` es el atajo declarativo que te da lista + formulario + eliminación para una entidad sin
+cableado extra:
+
+```java
+new CrudPage("books", "Books", Book.class);                       // bean CrudService por defecto
+new CrudPage("books", "Books", Book.class, "customCrudService");  // bean CrudService nombrado
+```
+
+Para cualquier cosa que no sea una pantalla CRUD genérica, usa `Page` (una vista ZUL escrita a mano
+o un recurso del classpath) o `ExternalPage` (un enlace que se abre fuera del shell de la
+aplicación):
+
+```java
+new Page("sales-report", "Sales Report", "classpath:/pages/sales-report.zul");
+new ExternalPage("docs", "Documentation", "https://dynamia.tools");
+```
+
+`Page` también expone callbacks de ciclo de vida (`onOpen`, `onClose`, `onUnload`),
+`setClosable(...)`, `setShowAsPopup(...)`, y marcadores `featured(...)`/`main()` para páginas que
+deban destacarse o actuar como la página de aterrizaje del módulo — nada de esto aplica a
+`CrudPage` a menos que necesites sobrescribir su vista generada.
+
+## Rutas virtuales y búsqueda
+
+Cada elemento navegable se resuelve a una **ruta virtual** — una cadena de ids unidos por `/` desde
+el módulo hasta la página — usada tanto para navegación programática como para búsquedas en
+`ModuleContainer`:
+
+```java
+NavigationManager.navigateTo("library/reports/sales-report");
+```
+
+```java
+@Autowired
+private ModuleContainer moduleContainer;
+
+Module library = moduleContainer.getModuleById("library");
+Page salesReport = moduleContainer.findPage("/library/reports/sales-report");
+```
+
+`Module.findPage(virtualPath)` busca dentro de un único módulo; `ModuleContainer.findPage(path)`
+busca en todos los módulos registrados. Ambos aceptan la misma forma `module/group/page`.
+
+## La API fluida del builder: `JavaModuleBuilder`
+
+Para módulos ensamblados de forma programática (impulsados por configuración, generados a partir
+de metadata) en lugar de escritos campo por campo, `Module.builder(...)` devuelve un
+`JavaModuleBuilder` — un step-builder que hace seguimiento del "grupo actual" para que no tengas
+que guardar tú mismo una referencia a `PageGroup`.
+
+```java
+JavaModuleBuilder builder = Module.builder("books", "Books", "fa-book", 1);
+
+builder.addGroup("main", "Main Group")
+        .addPage("list", "Book List", "/books/list", "fa-list", 1)
+        .addPage("detail", "Book Detail", "/books/detail", "fa-info", 2);
+
+Module booksModule = builder.build();
+```
+
+`addGroup(...)` cambia el "grupo actual" del builder; cada llamada a `addPage(...)` después de
+ese punto apunta a ese grupo hasta el siguiente `addGroup(...)`. Esto se lee bien para módulos con
+varios grupos agregados en secuencia, pero para un puñado de `CrudPage` de nivel superior el
+constructor directo más el encadenamiento fluido de los ejemplos anteriores suele ser menos código.
+
+<Aside type="tip">
+Prefiere `JavaModuleBuilder` cuando la lista de páginas en sí está guiada por datos (iterando sobre
+una lista de clases de entidad, por ejemplo); prefiere la cadena directa
+`new Module(...)`/`.addPage(...)` cuando la estructura es estática y conocida en tiempo de
+compilación — se lee más cercana al árbol de menú resultante.
+</Aside>
+
+## Relacionado
+
+- [Conceptos Clave](/es/key-concepts) — la introducción breve a Module/Page/Navigation.
+- [CrudService](/es/guides/crud-service) — la capa de persistencia a la que delega `CrudPage`.
+- [Actions](/es/guides/actions) — cómo adjuntar operaciones personalizadas a la toolbar de una página CRUD.
+- [Referencia Rápida](/es/reference/quick-reference) — hoja de referencia condensada de navegación.
