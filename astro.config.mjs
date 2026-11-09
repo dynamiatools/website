@@ -1,7 +1,8 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
 
-export const dynamiaToolsVersion = '26.7.0'
+export const dynamiaToolsVersion = '26.11.0'
 
 
 // https://astro.build/config
@@ -14,6 +15,7 @@ export default defineConfig({
     site: 'https://dynamia.tools',
     integrations: [
         starlight({
+            plugins: [starlightLinksValidator({exclude: ['http://localhost:8080', 'http://localhost:8080/**']})],
             title: 'DynamiaTools',
             logo: {
                 light: './src/assets/dynamia-tools-light.svg',
@@ -30,12 +32,50 @@ export default defineConfig({
                         sizes: '32x32',
                     },
                 },
+                {
+                    tag: 'meta',
+                    attrs: {property: 'og:image', content: 'https://dynamia.tools/og-image.png'},
+                },
+                {
+                    tag: 'meta',
+                    attrs: {property: 'og:image:alt', content: 'Dynamia Platform: full-stack Java 25 framework for enterprise web applications'},
+                },
+                {
+                    tag: 'meta',
+                    attrs: {name: 'twitter:image', content: 'https://dynamia.tools/og-image.png'},
+                },
+                {
+                    tag: 'script',
+                    attrs: {type: 'application/ld+json'},
+                    content: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@graph': [
+                            {
+                                '@type': 'WebSite',
+                                '@id': 'https://dynamia.tools/#website',
+                                name: 'Dynamia Platform',
+                                alternateName: 'DynamiaTools',
+                                url: 'https://dynamia.tools/',
+                                inLanguage: ['en', 'es'],
+                            },
+                            {
+                                '@type': 'SoftwareSourceCode',
+                                name: 'Dynamia Platform',
+                                codeRepository: 'https://github.com/dynamiatools/framework',
+                                programmingLanguage: 'Java',
+                                version: dynamiaToolsVersion,
+                                license: 'https://www.apache.org/licenses/LICENSE-2.0',
+                                url: 'https://dynamia.tools/',
+                            },
+                        ],
+                    }),
+                },
             ],
             customCss: [
                 './src/styles/custom.css'
             ],
             editLink: {
-                baseUrl: 'https://github.com/dynamiatools/website',
+                baseUrl: 'https://github.com/dynamiatools/website/edit/main/',
             },
             social: [
                 {icon: 'github', label: 'GitHub', href: 'https://github.com/dynamiatools/framework'}
@@ -49,23 +89,51 @@ export default defineConfig({
                 {
                     label: 'Start Here',
                     translations: {
-                        'es': 'Comieza Aqui'
+                        es: 'Comienza Aquí'
                     },
                     items: [
                         'getting-started',
                         'key-concepts',
-                        'custom-setup',
-                        'view-descriptors',
-                        'frontend-sdk',
-                        'vue-support'
+                        'custom-setup'
                     ]
                 },
                 {
-                    label: 'Guides',
+                    label: 'Domain & Data',
                     translations: {
-                        es: 'Guías',
+                        es: 'Dominio y Datos'
                     },
-                    autogenerate: {directory: 'guides'},
+                    items: [
+                        'guides/entities',
+                        'guides/crud-service',
+                        'guides/crud-listeners',
+                        'guides/validators',
+                        'guides/converters'
+                    ]
+                },
+                {
+                    label: 'Screens & Actions',
+                    translations: {
+                        es: 'Pantallas y Acciones'
+                    },
+                    items: [
+                        'view-descriptors',
+                        'guides/view-customizers',
+                        'guides/navigation',
+                        'guides/actions',
+                        'guides/ui-ports',
+                        'guides/list-filters'
+                    ]
+                },
+                {
+                    label: 'Frontend',
+                    translations: {
+                        es: 'Frontend'
+                    },
+                    items: [
+                        'frontend-sdk',
+                        'vue-support',
+                        'guides/microfrontends'
+                    ]
                 },
                 {
                     label: 'Extensions',
@@ -80,7 +148,9 @@ export default defineConfig({
                         es: 'Referencia',
                     },
                     items: [
-                        'reference/quick-reference'
+                        'reference/quick-reference',
+                        'guides/development-patterns',
+                        'reference/release-notes'
                     ]
                 },
                 {

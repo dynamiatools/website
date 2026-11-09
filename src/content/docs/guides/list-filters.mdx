@@ -1,0 +1,129 @@
+---
+title: List Filters and Queries
+description: Add portable toolbar filters to a CRUD list with Control and FilterAction, and shape the queries remote clients send to POST /find with a QuerySpecFilter.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A CRUD list can be filtered from the toolbar (a date range, a status, a search box) and, for
+remote clients, through the standard query message of `POST /api/{path}/find`. Both paths end in
+the same filtering logic on the server.
+
+<Aside type="note" title="Version">
+`Control`, `FilterAction`, `QuerySpec` and `QuerySpecFilter` are available in Dynamia Platform **26.11.0**.
+</Aside>
+
+## Toolbar filters: `FilterAction`
+
+A `FilterAction` is an action that leaves a **control** in the list toolbar. You only declare the
+entity and the control; there is nothing to implement.
+
+```java
+//mybookstore/actions/FilterByStatusAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import mybookstore.domain.BookStatus;
+import tools.dynamia.actions.ActionRuntime;
+import tools.dynamia.actions.Control;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.actions.RunsOn;
+import tools.dynamia.crud.actions.FilterAction;
+
+@InstallAction
+@RunsOn(ActionRuntime.FRONTEND) // required on the concrete class: the annotation is not inherited
+public class FilterByStatusAction extends FilterAction {
+
+    public FilterByStatusAction() {
+        super(Book.class, Control.choice("status", BookStatus.class).allLabel("All"));
+        setName("Status");
+    }
+}
+```
+
+`Control` is plain data, so every front end draws it with its own widgets:
+
+| Factory | Control |
+|---|---|
+| `Control.date(field)` | One date |
+| `Control.dateRange(field)` | A range of dates |
+| `Control.dateTimeRange(field)` | A range of dates with time |
+| `Control.text(field)` | Free text |
+| `Control.choice(field, EnumClass.class)` | One value of an enum (by constant name) |
+| `Control.choice(field, List<Option>)` | One value of a list of `Option(key, label)` |
+
+Refine a control with `label(...)`, `allLabel(...)` (the text of the "no filter" option of a choice)
+and `preset(...)`, a symbolic initial value the client resolves in the user's time zone: `TODAY`,
+`THIS_MONTH` or `LAST_MONTH`.
+
+```java
+Control.dateRange("publishDate").label("Published").preset("THIS_MONTH")
+```
+
+The `field` must be a field of the entity's view descriptor.
+
+- **In ZK** the control is drawn with the widget of its kind and the action runs on every change.
+- **In a remote client** (Vue) the control arrives in the action metadata and its value is sent as a
+  filter of `POST /find`. The action class does not run; the filtering is the same.
+
+## Queries from remote clients: `QuerySpec`
+
+`POST /api/{path}/find` takes a `QuerySpec`: filters, text search, sort and paging in one JSON body.
+The TypeScript side is `crud(path).find(spec)`; see
+[Filter, search and sort with `find()`](/frontend-sdk#filter-search-and-sort-with-find).
+
+```json
+{
+  "version": 1,
+  "filters": [
+    { "field": "publishDate", "op": "between", "value": ["2026-01-01", "2026-01-31"] }
+  ],
+  "search": "clean",
+  "sort": [{ "field": "title", "dir": "asc" }],
+  "page": 1,
+  "size": 20
+}
+```
+
+## Server-side query filters
+
+A `QuerySpecFilter` sees every `QuerySpec` before it becomes a query. Register it as a bean: the
+framework finds all of them and runs them in `order()`, lowest first, like an action filter.
+
+```java
+//mybookstore/query/HideDraftsFilter.java
+package mybookstore.query;
+
+import org.springframework.stereotype.Component;
+import tools.dynamia.crud.query.QuerySpec;
+import tools.dynamia.web.query.QueryContext;
+import tools.dynamia.web.query.QuerySpecFilter;
+
+@Component
+public class HideDraftsFilter implements QuerySpecFilter {
+
+    @Override
+    public QuerySpec filter(QueryContext context, QuerySpec spec) {
+        // Remove what the client may not choose...
+        var clean = spec.without("internalNotes");
+        // ...or add a condition the client cannot override
+        return clean.with(new QuerySpec.Filter("status", "in", java.util.List.of("PUBLISHED")));
+    }
+}
+```
+
+A filter can:
+
+- change the query (`spec.without(field)`, `spec.with(filter)`),
+- refuse it by throwing `tools.dynamia.domain.ValidationError` (HTTP 422) or `tools.dynamia.navigation.NavigationNotAllowedException` (HTTP 403).
+
+A filter only narrows what the view descriptor allows: after the chain, every field is checked
+against the descriptor again. `QueryContext` tells you what is being queried: the page `path`, the
+`entityClass`, the `descriptor` and the `operation`.
+
+## Related
+
+- [How Actions Work](/guides/actions)
+- [UI Ports for Actions](/guides/ui-ports)
+- [Frontend SDK](/frontend-sdk)
+- [View Descriptors](/view-descriptors)

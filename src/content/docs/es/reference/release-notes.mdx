@@ -1,0 +1,61 @@
+---
+title: Notas de versión
+description: Qué cambió en cada versión de Dynamia Platform, empezando por la 26.11.0, con enlaces a las guías que documentan las nuevas APIs.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Dynamia Platform usa [CalVer](/es/key-concepts) (`YY.MM.MINOR`) y todos los módulos, extensiones y paquetes npm
+comparten la misma versión. Esta página resume los cambios importantes y enlaza la guía de cada uno. La lista
+completa de versiones está en [GitHub](https://github.com/dynamiatools/framework/releases).
+
+## 26.11.0
+
+Publicada en Maven Central, GitHub Packages y npm (`@dynamia-tools/*`, todos en 26.11.0).
+
+### Puertos de UI, segunda ola
+
+Las acciones pueden hacer más sin importar ZK:
+
+- `UINavigation.openPage` y `UINavigation.refresh`
+- `CrudControllerAPI.getSelection()`
+- `UIChoices.pickEntity` sobre beans `EntityLookup`
+- `UIClipboard.copy`
+- Vistas previas de archivos en línea con `UIFiles.preview`
+- `UIMessages.showInput` con rango de fechas (`LocalDateRange`)
+
+Consulta [Puertos de UI para acciones](/es/guides/ui-ports).
+
+### Consultas y filtros
+
+- `POST /api/{path}/find` recibe un `QuerySpec` estándar (filtros con operadores, búsqueda, orden, paginación) y
+  puede restringirse en el servidor con beans `QuerySpecFilter`.
+- Los controles portables de la barra (`Control`, `FilterAction`) los dibujan ZK y Vue.
+- `crud(path).find(QuerySpec)` en `@dynamia-tools/sdk`.
+
+Consulta [Filtros y consultas de listas](/es/guides/list-filters) y [SDK Frontend](/es/frontend-sdk#filtrar-buscar-y-ordenar-con-find).
+
+### Acciones publicadas a los clientes
+
+`menuSupported` y `position` ahora forman parte de los metadatos de la acción. El menú de fila de Vue lista solo
+las acciones con `menuSupported` y las ordena por `position`. Consulta
+[Cómo funcionan las acciones](/es/guides/actions#menú-de-fila-y-orden).
+
+### Vue
+
+Los controles de la barra, las acciones de fila y el menú de fila tienen estilo. Consulta [Soporte Vue](/es/vue-support).
+
+### Migración de SaaS
+
+Los trabajos de exportación se finalizan como el tenant raíz, lo que corrige una descarga vacía. Consulta [SaaS](/es/extensions/saas).
+
+### Obsolescencia
+
+El framework ya no usa `HeadlessCapable`. Declara `@RunsOn(ActionRuntime.HEADLESS)` en la clase concreta. Consulta
+[Publicar acciones a clientes remotos](/es/guides/actions#publicar-acciones-a-clientes-remotos-runson).
+
+<Aside type="tip" title="Actualizar">
+Cambia la versión de las dependencias de Dynamia Platform y de los paquetes npm `@dynamia-tools/*` a `26.11.0`.
+Reemplaza `HeadlessCapable` por `@RunsOn(ActionRuntime.HEADLESS)` la próxima vez que toques una acción que lo
+implemente.
+</Aside>

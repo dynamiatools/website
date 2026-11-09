@@ -4,12 +4,12 @@
 
 This is the official documentation website for **Dynamia Platform** (https://dynamia.tools), the next generation of DynamiaTools. It's a cutting-edge full-stack Java 25 framework for building enterprise web applications powered by Spring Boot 4 and ZK 10.
 
-**Current Version**: 26.2.0 (CalVer: YY.MM.MINOR - February 2026)
+**Current Version**: 26.11.0 (CalVer: YY.MM.MINOR - November 2026)
 
 The website is built using:
-- **Astro** (v5.17.2+) - Static site generator
-- **Starlight** (v0.37.6+) - Documentation theme for Astro
-- **TypeScript** (v5.5.4+)
+- **Astro** (v5.18.2+) - Static site generator
+- **Starlight** (v0.37.7+, with starlight-links-validator: broken links fail the build) - Documentation theme for Astro
+- **TypeScript** (v5.9+)
 - **MDX** - For content with React components
 
 ## Claude Code / IntelliJ MCP Integration
@@ -36,7 +36,7 @@ website/
 │   │   │   ├── history.mdx
 │   │   │   ├── guides/     # Tutorial guides
 │   │   │   └── es/         # Spanish translations
-│   │   └── config.ts       # Content collections config
+│   ├── content.config.ts   # Content collections config (Starlight loaders)
 │   ├── assets/             # Images and static assets
 │   └── styles/
 │       └── custom.css      # Custom theme styles
@@ -49,9 +49,9 @@ website/
 ## Key Configuration
 
 ### Framework Version
-- Current Dynamia Platform version: **26.2.0** (CalVer format: YY.MM.MINOR)
+- Current Dynamia Platform version: **26.11.0** (CalVer format: YY.MM.MINOR)
 - Version is defined in `astro.config.mjs` as `dynamiaToolsVersion`
-- CalVer means: Year 26 (2026), Month 02 (February), Release 0
+- CalVer means: Year 26 (2026), Month 11 (November), Release 0
 - All Dynamia Platform modules share the same version (unified versioning)
 - When updating framework version, update this constant
 
@@ -84,7 +84,7 @@ When writing code examples for Dynamia Platform:
 - Reference **ZK 10** components when applicable
 - Include package declarations and imports
 - Add comments to explain key concepts
-- When mentioning versions, use CalVer format (e.g., 26.2.0)
+- When mentioning versions, use CalVer format (e.g., 26.11.0)
 
 ### TypeScript SDK + Vue Examples
 
@@ -154,7 +154,7 @@ Key Dynamia Platform concepts to explain clearly:
 ## Styling
 
 ### Custom Theme
-- Primary accent color: `hsl(150, 76%, 34%)` (green)
+- Primary accent color: `hsl(150, 76%, 34%)` (green) in dark mode; light mode uses `accent` `hsl(150, 76%, 30%)` and `accent-high` `hsl(150, 76%, 24%)` so text and buttons pass WCAG AA (see `src/styles/custom.css`)
 - Custom styles in `src/styles/custom.css`
 - Use CSS variables from Starlight theme
 - Support both light and dark modes
@@ -208,7 +208,7 @@ npm run astro check  # Type check
 3. Follow existing patterns for structure
 
 ### Updating Framework Version
-1. Update `dynamiaToolsVersion` in `astro.config.mjs` (e.g., from 26.2.0 to 26.3.0)
+1. Update `dynamiaToolsVersion` in `astro.config.mjs` (e.g., from 26.11.0 to 26.12.0)
 2. Update any version references in documentation
 3. Update code examples if API changed
 4. Remember: All Dynamia Platform modules share the same CalVer version
@@ -235,7 +235,7 @@ npm run astro check  # Type check
 8. **Cross-reference**: Link related concepts together
 9. **Update Both Languages**: When adding English content, plan for Spanish translation
 10. **Test Locally**: Always run `npm run dev` to preview changes
-11. **CalVer Consistency**: When mentioning versions, always use YY.MM.MINOR format (e.g., 26.2.0)
+11. **CalVer Consistency**: When mentioning versions, always use YY.MM.MINOR format (e.g., 26.11.0)
 
 ## External Resources
 

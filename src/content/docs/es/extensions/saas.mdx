@@ -3,6 +3,9 @@ title: SaaS
 description: Soporte multi-tenant con gestion de cuentas, aislamiento y validaciones remotas
 ---
 
+import { Aside } from '@astrojs/starlight/components';
+
+
 
 ## Que hace esta extension
 
@@ -100,3 +103,178 @@ public class Person implements AccountAware {
 }
 ```
 
+## Movilidad de tenants (Migración)
+
+El submódulo **Tenant Mobility** (`tools.dynamia.modules.saas.migration`) ofrece la gestión completa del ciclo de vida de los datos de un tenant: exportar, importar, clonar, respaldar y restaurar. Cada operación se ejecuta como un **trabajo asíncrono en segundo plano** sobre hilos virtuales, así que exportar o importar millones de filas nunca bloquea el hilo de la petición.
+
+| Operación | Descripción |
+|---|---|
+| `EXPORT` | Serializa todos los datos del tenant en un archivo ZIP versionado (un archivo JSON por entidad) |
+| `IMPORT` | Restaura los datos de un tenant desde un ZIP exportado antes |
+| `CLONE` | Duplica un tenant dentro del mismo sistema, con otro `accountId` |
+| `BACKUP` | Alias de `EXPORT`, etiquetado como respaldo |
+| `RESTORE` | Alias de `IMPORT` que reemplaza los datos existentes |
+
+<Aside type="caution" title="Hoja de ruta: aún no está implementado por completo">
+  `MIGRATE` (exportación entre entornos con importación remota en un solo paso) y la estrategia de identidad `UUID7` figuran en el README del módulo de migración como **planeadas**, no publicadas. Hoy, un movimiento entre entornos se hace como un `EXPORT` seguido de un `IMPORT` manual en el entorno destino, usando `KEEP_IDS` o `REGENERATE_IDS` (ver abajo) en lugar de `UUID7`.
+</Aside>
+
+### Excluir datos de la exportación
+
+```java
+//LoginAuditLog.java
+package myapp.audit;
+
+import jakarta.persistence.Entity;
+import tools.dynamia.modules.saas.api.AccountExportIgnore;
+import tools.dynamia.modules.saas.jpa.SimpleEntitySaaS;
+
+// Excluye la entidad completa de la exportación e importación
+@Entity
+@AccountExportIgnore
+public class LoginAuditLog extends SimpleEntitySaaS {
+    // ...
+}
+```
+
+```java
+//Customer.java
+package myapp.crm;
+
+import jakarta.persistence.Entity;
+import tools.dynamia.modules.saas.api.ExportIgnore;
+import tools.dynamia.modules.saas.jpa.SimpleEntitySaaS;
+
+@Entity
+public class Customer extends SimpleEntitySaaS {
+
+    @ExportIgnore
+    private String cachedScore; // campo calculado, no se exporta
+}
+```
+
+### Lanzar trabajos por REST
+
+```http
+POST /api/saas/migration/jobs/export/42
+Content-Type: application/json
+
+{
+  "chunkSize": 500,
+  "identityStrategy": "KEEP_IDS"
+}
+```
+
+```http
+GET /api/saas/migration/jobs/abc-123
+```
+
+```http
+GET /api/saas/migration/jobs/abc-123/download
+```
+
+La respuesta de un trabajo de exportación completado es un archivo ZIP llamado `Account42_20260614T100500.zip`.
+
+<Aside type="note" title="Corregido en la 26.11.0">
+Los trabajos de exportación ahora se finalizan como el tenant raíz, así que el archivo resultante se persiste y
+la descarga ya no sale vacía. Si veías un ZIP vacío en `/download` en una versión anterior, actualiza a la 26.11.0.
+</Aside>
+
+```http
+POST /api/saas/migration/jobs/import
+Content-Type: multipart/form-data
+
+file=@Account42_20260614T100500.zip
+targetAccountId=99
+identityStrategy=REGENERATE_IDS
+```
+
+```http
+POST /api/saas/migration/jobs/clone
+Content-Type: application/json
+
+{
+  "sourceAccountId": 42,
+  "targetAccountId": 99,
+  "identityStrategy": "REGENERATE_IDS"
+}
+```
+
+Superficie REST completa:
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/saas/migration/jobs/export/{accountId}` | Inicia un trabajo de exportación |
+| `POST` | `/api/saas/migration/jobs/import` | Inicia un trabajo de importación (multipart) |
+| `POST` | `/api/saas/migration/jobs/clone` | Inicia un trabajo de clonación |
+| `POST` | `/api/saas/migration/jobs/backup/{accountId}` | Inicia un trabajo de respaldo |
+| `POST` | `/api/saas/migration/jobs/restore/{accountId}` | Inicia un trabajo de restauración (multipart) |
+| `GET`  | `/api/saas/migration/jobs` | Lista todos los trabajos |
+| `GET`  | `/api/saas/migration/jobs/{jobId}` | Consulta el estado y el progreso de un trabajo |
+| `POST` | `/api/saas/migration/jobs/{jobId}/cancel` | Cancela un trabajo en ejecución |
+| `GET`  | `/api/saas/migration/jobs/{jobId}/download` | Descarga el ZIP resultante |
+
+### Estrategias de identidad
+
+| Estrategia | Estado | Descripción |
+|---|---|---|
+| `KEEP_IDS` | Publicada | Conserva los IDs originales de la base de datos; adecuada para restaurar entre entornos en una base destino vacía |
+| `REGENERATE_IDS` | Publicada | Asigna nuevos IDs autogenerados; segura para clonar dentro de la misma base de datos |
+| `UUID7` | Planeada | Usa UUIDv7 para todos los IDs; aún no está disponible |
+
+### Formato de exportación (v3)
+
+Cada exportación es un archivo ZIP con un manifiesto y un archivo JSON por tipo de entidad:
+
+```
+Account42_20260614T100500.zip
+├── manifest.json              ← metadatos + lista ordenada de entidades
+├── Account42_Customer.json
+├── Account42_Product.json
+└── Account42_Order.json
+```
+
+```json
+// manifest.json
+{
+  "version": "3",
+  "exportedAt": "2026-06-14T10:05:00",
+  "sourceAccountId": 42,
+  "identityStrategy": "KEEP_IDS",
+  "account": { "id": 42, "name": "Acme Corp" },
+  "entities": [
+    { "file": "Account42_Customer.json", "entityClass": "com.example.Customer" },
+    { "file": "Account42_Order.json",    "entityClass": "com.example.Order" }
+  ]
+}
+```
+
+Los campos de relación (`@ManyToOne`, `@OneToOne`) se serializan como `{fieldName}_ref_id`; las colecciones (`@OneToMany`, `@ManyToMany`) se reconstruyen de forma natural cuando las entidades hijas referencian a sus padres. Los archivos de entidad se escriben en paralelo (hasta `export-parallelism` hilos virtuales concurrentes) y se ensamblan en el ZIP en orden topológico.
+
+### Configuración
+
+```yaml
+# application.yml
+dynamia:
+  saas:
+    migration:
+      chunk-size: 500                                  # registros por página de paginación
+      output-directory: ${java.io.tmpdir}/saas-migration
+      max-concurrent-jobs: 5
+      export-parallelism: 4                             # tipos de entidad exportados en paralelo por trabajo
+      fail-on-entity-error: false                        # detenerse en el primer error o registrar y continuar
+```
+
+### Puntos de extensión (SPI)
+
+| Interfaz | Descripción |
+|---|---|
+| `IdentityMapper` | Estrategia propia de mapeo de IDs |
+| `MigrationProgressListener` | Gancho para eventos de progreso |
+| `CancellationToken` | Señal de cancelación cooperativa |
+
+## Relacionado
+
+- [Seguridad](/es/extensions/security) — autenticación y autorización.
+- [SDK Frontend](/es/frontend-sdk) — llama a la API de SaaS desde TypeScript.
+- [Notas de versión](/es/reference/release-notes)

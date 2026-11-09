@@ -1,6 +1,6 @@
 ---
 title: Getting Started
-description: Start fast with DynamiaTools
+description: "Build your first Dynamia Platform application in minutes: a Spring Boot project with an entity, automatic CRUD screens and REST endpoints."
 ---
 
 import {Aside} from '@astrojs/starlight/components';
@@ -26,7 +26,7 @@ DynamiaTools is compatible with Java, Groovy and Kotlin
     <dependency>
         <groupId>tools.dynamia</groupId>
         <artifactId>dynamia-tools-starter</artifactId>
-        <version>LAST_VERSION</version>
+        <version>VERSION</version>
     </dependency>
 </dependencies>
 ```
@@ -34,10 +34,10 @@ DynamiaTools is compatible with Java, Groovy and Kotlin
 **Gradle**
 ```groovy
 //build.gradle
-compile 'tools.dynamia:dynamia-tools-starter:LAST_VERSION'
+compile 'tools.dynamia:dynamia-tools-starter:VERSION'
 ```
 
-Go to [Maven Central](https://central.sonatype.com/artifact/tools.dynamia/tools.dynamia.app) to check last version.
+Replace `VERSION` with the latest release (26.11.0 at the time of writing). Check [Maven Central](https://central.sonatype.com/artifact/tools.dynamia/tools.dynamia.app) or the [GitHub releases](https://github.com/dynamiatools/framework/releases) for the last version.
 
 This starter enable DynamiaTools in your application and add support for ZK, JPA and custom views and routes.
 
@@ -350,3 +350,9 @@ Check that DynamiaTool default json form has this form:
 With this **Getting Started** guide, you’ve just built a web application with automatic CRUD support, automatic RESTful endpoints,
 and a responsive template. Continue with the following guides to learn advanced topics with DynamiaTools.
 
+## Next steps
+
+- [Key Concepts](/key-concepts) — the building blocks of an application.
+- [Entities](/guides/entities) and [Crud Service](/guides/crud-service) — model and persist your data.
+- [View Descriptors](/view-descriptors) — shape forms and tables with YAML.
+- [Frontend SDK](/frontend-sdk) and [Vue Support](/vue-support) — build a custom frontend on the generated REST API.

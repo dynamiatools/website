@@ -1,0 +1,129 @@
+---
+title: Filtros y consultas de listas
+description: "Agrega filtros portables a la barra de una lista CRUD con Control y FilterAction, y da forma a las consultas que envían los clientes remotos a POST /find con un QuerySpecFilter."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Una lista CRUD puede filtrarse desde la barra de herramientas (un rango de fechas, un estado, un cuadro de
+búsqueda) y, para clientes remotos, con el mensaje de consulta estándar de `POST /api/{path}/find`. Ambos
+caminos terminan en la misma lógica de filtrado en el servidor.
+
+<Aside type="note" title="Versión">
+`Control`, `FilterAction`, `QuerySpec` y `QuerySpecFilter` están disponibles en Dynamia Platform **26.11.0**.
+</Aside>
+
+## Filtros de la barra: `FilterAction`
+
+Un `FilterAction` es una acción que deja un **control** en la barra de la lista. Solo declaras la entidad y el
+control; no hay nada que implementar.
+
+```java
+//mybookstore/actions/FilterByStatusAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import mybookstore.domain.BookStatus;
+import tools.dynamia.actions.ActionRuntime;
+import tools.dynamia.actions.Control;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.actions.RunsOn;
+import tools.dynamia.crud.actions.FilterAction;
+
+@InstallAction
+@RunsOn(ActionRuntime.FRONTEND) // obligatorio en la clase concreta: la anotación no se hereda
+public class FilterByStatusAction extends FilterAction {
+
+    public FilterByStatusAction() {
+        super(Book.class, Control.choice("status", BookStatus.class).allLabel("Todos"));
+        setName("Estado");
+    }
+}
+```
+
+`Control` son datos simples, así que cada frontend lo dibuja con sus propios widgets:
+
+| Fábrica | Control |
+|---|---|
+| `Control.date(field)` | Una fecha |
+| `Control.dateRange(field)` | Un rango de fechas |
+| `Control.dateTimeRange(field)` | Un rango de fechas con hora |
+| `Control.text(field)` | Texto libre |
+| `Control.choice(field, EnumClass.class)` | Un valor de un enum (por nombre de constante) |
+| `Control.choice(field, List<Option>)` | Un valor de una lista de `Option(key, label)` |
+
+Ajusta un control con `label(...)`, `allLabel(...)` (el texto de la opción «sin filtro» de una elección) y
+`preset(...)`, un valor inicial simbólico que el cliente resuelve en la zona horaria del usuario: `TODAY`,
+`THIS_MONTH` o `LAST_MONTH`.
+
+```java
+Control.dateRange("publishDate").label("Publicado").preset("THIS_MONTH")
+```
+
+El `field` debe ser un campo del descriptor de vista de la entidad.
+
+- **En ZK** el control se dibuja con el widget de su tipo y la acción se ejecuta en cada cambio.
+- **En un cliente remoto** (Vue) el control llega en los metadatos de la acción y su valor se envía como filtro
+  de `POST /find`. La clase de la acción no se ejecuta; el filtrado es el mismo.
+
+## Consultas de clientes remotos: `QuerySpec`
+
+`POST /api/{path}/find` recibe un `QuerySpec`: filtros, búsqueda de texto, orden y paginación en un solo cuerpo
+JSON. En TypeScript se usa `crud(path).find(spec)`; consulta
+[Filtrar, buscar y ordenar con `find()`](/es/frontend-sdk#filtrar-buscar-y-ordenar-con-find).
+
+```json
+{
+  "version": 1,
+  "filters": [
+    { "field": "publishDate", "op": "between", "value": ["2026-01-01", "2026-01-31"] }
+  ],
+  "search": "clean",
+  "sort": [{ "field": "title", "dir": "asc" }],
+  "page": 1,
+  "size": 20
+}
+```
+
+## Filtros de consulta en el servidor
+
+Un `QuerySpecFilter` ve cada `QuerySpec` antes de que se convierta en consulta. Regístralo como bean: el
+framework los encuentra todos y los ejecuta en orden de `order()`, de menor a mayor, como un filtro de acciones.
+
+```java
+//mybookstore/query/HideDraftsFilter.java
+package mybookstore.query;
+
+import org.springframework.stereotype.Component;
+import tools.dynamia.crud.query.QuerySpec;
+import tools.dynamia.web.query.QueryContext;
+import tools.dynamia.web.query.QuerySpecFilter;
+
+@Component
+public class HideDraftsFilter implements QuerySpecFilter {
+
+    @Override
+    public QuerySpec filter(QueryContext context, QuerySpec spec) {
+        // Quita lo que el cliente no puede elegir...
+        var clean = spec.without("internalNotes");
+        // ...o agrega una condición que el cliente no puede anular
+        return clean.with(new QuerySpec.Filter("status", "in", java.util.List.of("PUBLISHED")));
+    }
+}
+```
+
+Un filtro puede:
+
+- cambiar la consulta (`spec.without(field)`, `spec.with(filter)`),
+- rechazarla lanzando `tools.dynamia.domain.ValidationError` (HTTP 422) o `tools.dynamia.navigation.NavigationNotAllowedException` (HTTP 403).
+
+Un filtro solo restringe lo que permite el descriptor de vista: después de la cadena, cada campo se valida de
+nuevo contra el descriptor. `QueryContext` indica qué se consulta: la ruta de la página (`path`), la
+`entityClass`, el `descriptor` y la `operation`.
+
+## Relacionado
+
+- [Cómo funcionan las acciones](/es/guides/actions)
+- [Puertos de UI para acciones](/es/guides/ui-ports)
+- [SDK Frontend](/es/frontend-sdk)
+- [Descriptores de vista](/es/view-descriptors)

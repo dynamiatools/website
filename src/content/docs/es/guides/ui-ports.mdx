@@ -1,0 +1,248 @@
+---
+title: Puertos de UI para acciones
+description: "Habla con el usuario desde una acción sin importar ZK: mensajes, preguntas, selectores de entidad, vistas previas de archivos, portapapeles y navegación funcionan igual en ZK y en clientes remotos."
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Una acción suele necesitar hablar con el usuario: mostrar un mensaje, hacer una pregunta, dejarle elegir un
+registro, previsualizar un PDF o abrir otra página. En Dynamia Platform lo haces con **puertos de UI**:
+pequeñas fachadas estáticas del paquete `tools.dynamia.ui` que no dependen de ZK.
+
+La misma acción funciona entonces en la interfaz ZK y en clientes remotos como el frontend Vue
+(`@dynamia-tools/vue`), porque cada puerto tiene un adaptador para cada frontend.
+
+<Aside type="note" title="Versión">
+`UINavigation.openPage` y `refresh`, `UIChoices.pickEntity`, `UIClipboard`, `UIFiles.preview` y
+`UIMessages.showInput` están disponibles en Dynamia Platform **26.11.0**.
+</Aside>
+
+## Una acción, varios frontends
+
+```text
+ Acción ──► UIMessages / UIChoices / UIFiles / UIClipboard / UINavigation
+                         │
+            ┌────────────┴─────────────┐
+            ▼                          ▼
+      Adaptador ZK              Adaptador replay
+   (widgets, ventanas)    (REST: la acción se ejecuta de nuevo desde
+                           el inicio en cada respuesta del usuario)
+                                      │
+                                      ▼
+                         Vue y otros clientes remotos
+```
+
+## Las fachadas
+
+| Fachada | Para qué sirve |
+|---|---|
+| `UIMessages` | Mensajes, preguntas de sí/no y diálogos para pedir un valor |
+| `UIChoices` | Elegir uno o varios elementos de una lista, o elegir una entidad con un lookup |
+| `UIFiles` | Descargar, previsualizar y subir archivos |
+| `UIClipboard` | Copiar texto al portapapeles del usuario |
+| `UINavigation` | Abrir una URL, abrir una página de la aplicación, refrescar la vista actual |
+
+## Pedir un valor: `UIMessages.showInput`
+
+`showInput` muestra un pequeño diálogo con el componente adecuado a la clase del valor: un selector de fecha
+para fechas, un campo numérico para números, etc. El callback recibe el valor, o `null` cuando el usuario lo
+deja vacío.
+
+```java
+UIMessages.showInput("Reporte desde", java.time.LocalDate.class, from -> {
+    // construir el reporte a partir de 'from'
+});
+
+// Con valor por defecto
+UIMessages.showInput("Copias", Integer.class, 1, copies -> print(copies));
+```
+
+También puedes pedir un `tools.dynamia.commons.LocalDateRange` para que el usuario elija fecha inicial y
+final en un solo diálogo:
+
+```java
+import tools.dynamia.commons.LocalDateRange;
+import tools.dynamia.ui.UIMessages;
+
+UIMessages.showInput("Periodo de ventas", LocalDateRange.class, range -> {
+    // range es un LocalDateRange (null si el usuario lo deja vacío)
+});
+```
+
+## Elegir una entidad: `UIChoices.pickEntity`
+
+`pickEntity` abre un selector con búsqueda sobre un **lookup** con nombre. Un lookup es un bean de Spring que
+implementa `EntityLookup<T>`; la fachada lo encuentra por su `name()`.
+
+```java
+//mybookstore/lookups/AuthorLookup.java
+package mybookstore.lookups;
+
+import java.util.List;
+import java.util.Optional;
+import org.springframework.stereotype.Component;
+import tools.dynamia.ui.EntityLookup;
+
+@Component
+public class AuthorLookup implements EntityLookup<Author> {
+
+    private final AuthorRepository repository;
+
+    public AuthorLookup(AuthorRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public String name() {
+        return "authors"; // el nombre que usa UIChoices.pickEntity
+    }
+
+    @Override
+    public boolean isSearchable() {
+        return true; // el selector envía el texto escrito a search(...)
+    }
+
+    @Override
+    public List<Author> search(String text, int limit) {
+        // limit nunca supera EntityLookup.MAX_LIMIT (50)
+        return repository.searchByName(text, limit);
+    }
+
+    @Override
+    public Optional<Author> find(String key) {
+        return repository.findById(Long.valueOf(key));
+    }
+
+    @Override
+    public String key(Author author) {
+        return String.valueOf(author.getId());
+    }
+
+    @Override
+    public String label(Author author) {
+        return author.getName();
+    }
+}
+```
+
+Úsalo desde una acción:
+
+```java
+UIChoices.<Author>pickEntity("authors", "Elige el autor", author -> {
+    book.setAuthor(author);
+    crudService.save(book);
+});
+```
+
+Si ningún `EntityLookup` tiene ese nombre, `pickEntity` lanza `IllegalArgumentException`.
+
+Para una lista fija de opciones usa `chooseOne` o `chooseMany`:
+
+```java
+UIChoices.chooseOne("Formato de exportación", List.of("PDF", "Excel", "CSV"), format -> export(format));
+```
+
+## Previsualizar un archivo: `UIFiles.preview`
+
+`UIFiles.download` guarda un archivo; `UIFiles.preview` se lo muestra al usuario en su lugar. Solo se muestran
+en línea los PDF, las imágenes comunes (PNG, JPEG, GIF, WebP) y el texto plano. Cualquier otro tipo se
+descarga automáticamente, así que puedes llamarlo con cualquier contenido.
+
+```java
+// Desde memoria
+UIFiles.preview("factura-1001.pdf", "application/pdf", pdfBytes);
+
+// Desde el sistema de archivos
+UIFiles.preview(Path.of("/var/reports/resumen.pdf"), "application/pdf");
+```
+
+## Copiar al portapapeles: `UIClipboard.copy`
+
+```java
+UIClipboard.copy(book.getIsbn());
+UIMessages.showMessage("ISBN copiado", MessageType.INFO);
+```
+
+Los navegadores solo dejan escribir el portapapeles tras un gesto del usuario. Si la escritura es rechazada,
+el cliente muestra el texto en un diálogo con un botón de copiar, así que el texto siempre llega al usuario.
+
+## Navegar: `UINavigation`
+
+| Método | Efecto |
+|---|---|
+| `open(url)` | Abre una URL |
+| `openInNewWindow(url)` | Abre una URL en una ventana o pestaña nueva |
+| `openPage(path)` / `openPage(path, params)` | Abre una página de la aplicación (una ruta de `CrudPage`) |
+| `refresh()` | Recarga la vista CRUD actual |
+
+`openPage` es para páginas de tu aplicación, no para URLs. Un valor que no sea una ruta de página lanza
+`IllegalArgumentException`. Los valores de los parámetros deben ser `String`, `Number` o `Boolean`.
+
+```java
+UINavigation.openPage("/books", Map.of("status", "OUT_OF_STOCK"));
+UINavigation.refresh();
+```
+
+## Leer la selección
+
+Dentro de una acción CRUD, `CrudControllerAPI.getSelection()` devuelve las filas que el usuario seleccionó:
+
+```java
+@Override
+public void actionPerformed(CrudActionEvent evt) {
+    List<Book> selected = evt.getController().getSelection();
+    // ...
+}
+```
+
+## Una acción completa
+
+```java
+//mybookstore/actions/CopyIsbnAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIClipboard;
+import tools.dynamia.ui.UIMessages;
+
+@InstallAction
+public class CopyIsbnAction extends AbstractCrudAction {
+
+    public CopyIsbnAction() {
+        setName("Copiar ISBN");
+        setImage("copy");
+        setApplicableClass(Book.class);
+        setMenuSupported(true); // actúa sobre un registro: aparece en el menú de la fila
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        if (evt.getData() instanceof Book book && book.getIsbn() != null) {
+            UIClipboard.copy(book.getIsbn());
+            UIMessages.showMessage("ISBN copiado", MessageType.INFO);
+        } else {
+            UIMessages.showMessage("Este libro no tiene ISBN", MessageType.WARNING);
+        }
+    }
+}
+```
+
+## Verificar qué soporta el frontend actual
+
+No todos los frontends implementan todos los puertos. Pregunta antes de depender de uno:
+
+```java
+if (UIPlatform.supports(ChoicesProvider.class)) {
+    UIChoices.pickEntity("authors", "Elige el autor", this::assign);
+}
+```
+
+## Relacionado
+
+- [Cómo funcionan las acciones](/es/guides/actions) — registro y organización de acciones.
+- [SDK Frontend](/es/frontend-sdk) y [Soporte Vue](/es/vue-support) — los clientes remotos que dibujan estos puertos.
+- [Referencia rápida](/es/reference/quick-reference) — hoja de referencia de una página.

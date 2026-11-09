@@ -1,22 +1,34 @@
 ---
 title: Crud Service
+description: CrudService es la abstracción de persistencia detrás de cada entidad en Dynamia Platform — catálogo completo de métodos, la API fluida de QueryParameters y ayudas para transacciones.
 ---
 
-`CrudService` es la abstraccion principal para operaciones CRUD en DynamiaTools.
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
-## Que hace
+`tools.dynamia.domain.services.CrudService` es la abstracción única de acceso a datos en Dynamia Platform.
+Cada vista CRUD, página de módulo, acción y servicio de aplicación pasa por ella, en lugar de repositorios
+hechos a mano o un `EntityManager` directo. Inyéctala, úsala y deja que el framework se ocupe de la
+fontanería de JPA.
 
-- Crear, consultar, actualizar y eliminar entidades.
-- Centralizar acceso a datos para vistas CRUD y procesos de aplicacion.
-- Evitar repositorios repetitivos en escenarios estandar.
+<Aside type="caution">
+No inyectes `EntityManager` ni `Session` directamente en los servicios de aplicación. Eso se salta la cadena
+de listeners (`CrudServiceListener`), la auditoría y los ganchos de caché que ofrece `CrudService`; es un
+antipatrón documentado en el framework.
+</Aside>
 
-## Implementacion por defecto
+## Implementación por defecto
 
-La implementacion comun es `JpaCrudService`, basada en JPA.
+La implementación incluida está basada en JPA (`JpaCrudService`) y se autoconfigura con
+`@EnableDynamiaTools`. Nunca la instancias tú: inyecta la interfaz `CrudService`:
 
 ```java
+//demo/CustomerAppService.java
+package demo;
+
 import org.springframework.stereotype.Service;
-import tools.dynamia.crud.CrudService;
+import tools.dynamia.domain.services.CrudService;
+
+import java.util.List;
 
 @Service
 public class CustomerAppService {
@@ -33,16 +45,220 @@ public class CustomerAppService {
         crudService.save(customer);
     }
 
-    public List<Custome> findActiveCustomers() {
-        return crudService.findAll(Customer.class, "active", true);
+    public List<Customer> findActiveCustomers() {
+        return crudService.find(Customer.class, "active", true);
     }
 }
 ```
 
-## Buenas practicas
+Si un módulo necesita un `CrudService` alterno (otro gestor de transacciones, un backend remoto o REST, etc.),
+regístralo como un bean con nombre y apunta una `CrudPage` hacia él con
+`new CrudPage("id", "Name", Customer.class, "myCustomCrudService")`.
 
-- Usa `CrudService` desde servicios de aplicacion, no directamente desde controladores complejos.
-- Encapsula reglas de negocio en servicios Spring.
-- Mantiene las entidades limpias y validadas con Bean Validation.
-- Para consultas avanzadas, combina `CrudService` con componentes de consulta especializados.
+## Operaciones básicas
 
+| Método | Propósito |
+|---|---|
+| `save(T entity)` | Crea o actualiza, según tenga o no `id`. Es lo que usarás el 95 % de las veces. |
+| `create(T entity)` | Fuerza un insert. |
+| `update(T entity)` | Fuerza un merge o reasociación. |
+| `find(Class<T> type, Serializable id)` | Busca por clave primaria. |
+| `load(Class<T> type, Serializable id)` | Busca por clave primaria **y** carga de inmediato su grafo de relaciones. |
+| `delete(T entity)` / `delete(Class type, Serializable id)` | Elimina una instancia o por id. |
+| `deleteAll(Class type)` | Elimina masivamente todas las filas de un tipo; úsalo con cuidado. |
+| `count(Class type)` / `count(Class type, QueryParameters params)` | Conteos de filas, con filtro opcional. |
+| `exists(Class type, Object id)` | Verifica existencia sin cargar la entidad. |
+| `reload(T entity)` | Refresca desde la base de datos una instancia ya cargada. |
+
+```java
+Book book = new Book("Effective Java", author);
+book = crudService.create(book);            // fuerza INSERT
+
+book.setPrice(new BigDecimal("45.00"));
+crudService.update(book);                    // fuerza UPDATE
+
+Book same = crudService.save(book);          // INSERT o UPDATE, según el id
+```
+
+## Filtrar con `find` y `QueryParameters`
+
+Para todo lo que vaya más allá de «dame todo», combina `find`, `findReadOnly` y `count` con
+`QueryParameters`, un constructor fluido de filtros, orden y paginación independiente de JPQL.
+
+```java
+List<Book> published = crudService.find(Book.class,
+        QueryParameters.with("category", category)
+                .add("active", true)
+                .orderBy("title", true)
+                .paginate(20));
+```
+
+- `QueryParameters.with(name, value)` — crea una instancia nueva con un filtro de igualdad.
+- `.add(name, value)` — encadena más filtros de igualdad.
+- `.orderBy(column, asc)` / `.orderBy(column)` — ordena (ascendente por defecto).
+- `.paginate(pageSize)` / `.paginate(new DataPaginator(totalSize, pageSize, page))` — pagina el resultado.
+- `.addGroup(otherParams, BooleanOp.OR)` — combina un grupo anidado de condiciones con `AND` u `OR`.
+
+Los valores simples se convierten en `=` (o `LIKE` para cadenas buscables). Para condiciones más ricas, envuelve
+el valor con un `QueryCondition` de `QueryConditions`:
+
+```java
+import static tools.dynamia.domain.query.QueryConditions.*;
+
+List<Book> results = crudService.find(Book.class,
+        QueryParameters.with("title", like("effective"))
+                .add("price", between(20, 60))
+                .add("publishedDate", geqt(LocalDate.of(2020, 1, 1)))
+                .add("status", in(BookStatus.ACTIVE, BookStatus.FEATURED))
+                .orderBy("publishedDate", false));
+```
+
+`QueryConditions` cubre `eq`, `like`, `startsWith`, `endsWith`, `gt`/`geqt`/`lt`/`leqt`, `between` (números,
+fechas y rangos de `LocalDate`/`LocalDateTime`), `in`/`notIn` (varargs, `List` o una subconsulta) e
+`isNull`/`isNotNull`; cada uno con una sobrecarga que acepta un `BooleanOp` para mezclar lógica `AND`/`OR`
+dentro del mismo `QueryParameters`.
+
+Usa `findReadOnly` en lugar de `find` para pantallas de reportes o de solo lectura: evita el costo de
+detección de cambios en entidades que sabes que no vas a modificar.
+
+## `findByFields` y `findByExample`
+
+Dos atajos para cuadros de búsqueda y widgets de autocompletado, sin escribir JPQL:
+
+```java
+// Busca "smith" en nombre y correo, conservando los filtros ya definidos
+List<Contact> matches = crudService.findByFields(Contact.class, "smith",
+        QueryParameters.with("active", true), "name", "email");
+
+// Búsqueda por prototipo: los campos no nulos del ejemplo se vuelven filtros
+Contact example = new Contact();
+example.setCity("Bogotá");
+example.setActive(true);
+List<Contact> sameCity = crudService.findByExample(example);
+
+// ... con paginación y orden
+List<Contact> page1 = crudService.findByExample(example,
+        new DataPaginator(20), new BeanSorter<>("name", true));
+```
+
+## Consultas personalizadas y reutilizables
+
+Para lo que `QueryParameters` por sí solo no puede expresar, construye un `QueryBuilder` y reutilízalo en
+distintos puntos de llamada:
+
+```java
+public List<Book> findLowStock(int threshold) {
+    QueryBuilder query = QueryBuilder.select()
+            .from(Book.class, "b")
+            .where("b.stock <= :threshold");
+
+    return crudService.executeQuery(query,
+            QueryParameters.with("threshold", threshold));
+}
+```
+
+`executeQuery` también acepta directamente una cadena JPQL (`executeQuery(String queryText,
+QueryParameters parameters)`) cuando no necesitas la composición del builder.
+
+Los valores agregados (`count`, `sum`, `max`, `avg`) se obtienen con `executeProjection`, que devuelve un único
+resultado tipado en lugar de una lista:
+
+```java
+BigDecimal totalRevenue = crudService.executeProjection(BigDecimal.class,
+        "select sum(o.total) from Order o where o.status = :status",
+        QueryParameters.with("status", OrderStatus.PAID));
+
+Long activeCount = crudService.executeProjection(Long.class, query); // sobrecarga con QueryBuilder
+```
+
+## Actualizaciones masivas sin cargar entidades
+
+Cuando necesitas tocar muchas filas o un solo campo, evita el ciclo cargar, modificar y guardar:
+
+```java
+// Actualiza un campo de una entidad, directo en la base de datos
+crudService.updateField(book, "stock", 42);
+
+// Actualización masiva: fija un campo en cada fila que cumpla el filtro
+int updated = crudService.batchUpdate(Book.class, "featured", true,
+        QueryParameters.with("category", category));
+
+// Actualización masiva: varios campos a la vez
+int rows = crudService.batchUpdate(Book.class,
+        Map.of("active", false, "archivedAt", LocalDateTime.now()),
+        QueryParameters.with("stock", 0));
+
+// Contadores atómicos (un contador es solo un campo numérico de la entidad)
+crudService.increaseCounter(book, "viewCount");
+crudService.deacreaseCounter(book, "stock");   // nota: la API lo escribe "deacrease"
+```
+
+<Aside type="tip">
+`updateField`, `batchUpdate`, `increaseCounter` y `deacreaseCounter` emiten sentencias UPDATE directas: se
+saltan los callbacks de `CrudServiceListener` y la caché de primer nivel de JPA. Úsalos cuando necesites
+rendimiento sobre conjuntos grandes; usa `save` o `update` cuando deban ejecutarse tus
+[CRUD listeners](/es/guides/crud-listeners) o tus [validadores](/es/guides/validators).
+</Aside>
+
+## Ejecutar fuera de la transacción actual
+
+`executeWithinTransaction` y `saveWithinTransaction` abren una transacción **nueva**, independiente de la que
+esté activa. Es la salida de emergencia para trabajos en segundo plano, acciones que deben persistir un registro
+de log aunque la operación que las rodea haga rollback después, o [acciones](/es/guides/actions) de larga
+duración que no deben mantener una sola transacción abierta todo el tiempo:
+
+```java
+public void recordAudit(Book book, String message) {
+    crudService.executeWithinTransaction(() -> {
+        AuditLog log = new AuditLog(book.getId(), message);
+        crudService.save(log);
+    });
+}
+
+// Atajo para el caso común de «guardar esto en su propia transacción»
+crudService.saveWithinTransaction(new AuditLog(book.getId(), "reindexed"));
+```
+
+## Catálogo completo de métodos
+
+<CardGrid>
+    <Card title="Lectura" icon="magnifier">
+        `find`, `findAll`, `findReadOnly`, `findSingle`, `findFirst`, `findByFields`,
+        `findByExample`, `findByRemoteId`, `findIfNull`, `getReference`, `getPropertyValues`
+    </Card>
+    <Card title="Escritura" icon="pencil">
+        `save`, `create`, `update`, `delete`, `deleteAll`, `updateField`, `batchUpdate`,
+        `increaseCounter`, `deacreaseCounter`
+    </Card>
+    <Card title="Consultas y agregados" icon="setting">
+        `executeQuery`, `execute`, `executeProjection`, `findWithNamedQuery`,
+        `findSingleWithNameQuery`, `findByNativeQuery`, `count`, `exists`
+    </Card>
+    <Card title="Transacciones y otros" icon="approve-check">
+        `executeWithinTransaction`, `saveWithinTransaction`, `reload`, `getId`,
+        `getFieldValue`, `getDelgate`
+    </Card>
+</CardGrid>
+
+`getDelgate()` devuelve el delegado de persistencia subyacente (normalmente el `EntityManager` de JPA) para el
+raro caso en que necesites bajar un nivel; trátalo como una salida de emergencia, no como punto de partida.
+
+## Buenas prácticas
+
+- Llama a `CrudService` desde clases `@Service` de la aplicación, no directamente desde controladores ni desde
+  lógica pesada de vistas: mantén separadas la persistencia y la presentación.
+- Prefiere `QueryParameters` + `QueryConditions` sobre JPQL armado con concatenación de cadenas; es más seguro
+  frente a inyección y se lee de forma declarativa.
+- Usa `batchUpdate`, `updateField` y los contadores cuando actualices muchas filas o un solo campo y no
+  necesites los callbacks de los listeners; usa `save` o `update` cuando sí los necesites.
+- Mantén tus entidades validadas con Bean Validation y con implementaciones de `Validator<T>` del framework:
+  `CrudService` no reemplaza la validación, la dispara.
+- Para operaciones avanzadas de varios pasos, combina `CrudService` con `executeWithinTransaction` y
+  [CRUD listeners](/es/guides/crud-listeners) en lugar de escribir a mano los límites de transacción.
+
+## Relacionado
+
+- [Entidades](/es/guides/entities) — el modelo JPA sobre el que opera `CrudService`.
+- [Crud Listeners](/es/guides/crud-listeners) — ganchos del ciclo de vida de `save`, `create`, `update` y `delete`.
+- [Cómo funcionan las acciones](/es/guides/actions) — el principal llamador de `CrudService` desde la capa de UI.
+- [Descriptores de vista](/es/view-descriptors) — cómo las vistas `crud`, `table` y `form` consultan a través de `CrudService`.

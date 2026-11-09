@@ -8,18 +8,35 @@ hero:
         file: ../../assets/dynamia-tools-splash.webp
     actions:
         - text: Getting Started
-          link: getting-started
+          link: /getting-started/
           icon: right-arrow
+        - text: What's new in 26.11.0
+          link: /reference/release-notes/
+          icon: star
+          variant: secondary
         - text: View on Github
           link: https://github.com/dynamiatools/framework
           icon: external
           variant: minimal
 ---
 
-import {Card, CardGrid, LinkButton} from '@astrojs/starlight/components';
+import {Card, CardGrid, LinkButton, LinkCard} from '@astrojs/starlight/components';
 import {dynamiaToolsVersion} from '../../../astro.config.mjs';
 
 export const version = dynamiaToolsVersion;
+
+## Choose your path
+
+<CardGrid>
+    <LinkCard title="I am new here" description="Build a running application with CRUD screens and REST endpoints in minutes." href="/getting-started/" />
+    <LinkCard title="Model my data" description="Entities, the Crud Service, listeners and validators." href="/guides/entities/" />
+    <LinkCard title="Build screens and actions" description="View descriptors, navigation, actions, UI ports and list filters." href="/view-descriptors/" />
+    <LinkCard title="Use a Vue or TypeScript frontend" description="The typed SDK and metadata-driven Vue components." href="/frontend-sdk/" />
+    <LinkCard title="Add enterprise features" description="SaaS, reports, dashboards, security, files, email and SMS." href="/extensions/" />
+    <LinkCard title="Look something up" description="Quick reference and release notes." href="/reference/quick-reference/" />
+</CardGrid>
+
+## About the platform
 
 <CardGrid stagger>
     <Card title="What is Dynamia Platform?" icon="pencil">
@@ -55,18 +72,17 @@ export const version = dynamiaToolsVersion;
             Know our history
         </LinkButton>
     </Card>
-    <Card title="What's new in v26?" icon="star">
-        The **26.x series** brings major improvements:
+    <Card title="What's new in 26.11.0?" icon="star">
+        The latest release ({version}) brings:
 
-        * 📅 **CalVer Versioning** - All modules share the same version ({version})
-        * ☕ **Java 25** - Latest JVM features and performance
-        * 🚀 **Spring Boot 4** - Next-gen Spring ecosystem
-        * 🏢 **Unified Repository** - Core + Extensions together
-        * 📦 **Built-in Extensions** - SaaS, reporting, dashboard, security, email/SMS, file management
-        * ⚡ **Zero-Config Philosophy** - Sensible defaults with easy customization
-        * 🛡️ **Enterprise-Grade** - Multi-tenancy, security, and scalability
+        * 🧩 **UI ports** - Actions that talk to the user without ZK: entity pickers, file previews, clipboard and navigation
+        * 🔎 **Queries and filters** - `POST /find` with a standard `QuerySpec`, portable toolbar filters and `crud(path).find()` in the SDK
+        * 📋 **Row menu** - Actions publish `menuSupported` and `position` to Vue and other clients
+        * 🏢 **SaaS** - Export jobs finalized as the root tenant, fixing an empty download
 
-        All powered by a **production-proven** platform used by companies across Latin America and Europe.
+        <LinkButton href="/reference/release-notes/" variant="secondary">
+            Read the release notes
+        </LinkButton>
     </Card>
     <Card title="Frontend SDK - Build Modern UIs" icon="laptop">
         The new frontend stack is now modular:
