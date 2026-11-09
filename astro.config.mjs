@@ -1,5 +1,6 @@
 import {defineConfig} from 'astro/config';
 import starlight from '@astrojs/starlight';
+import starlightLinksValidator from 'starlight-links-validator';
 
 export const dynamiaToolsVersion = '26.11.0'
 
@@ -14,6 +15,7 @@ export default defineConfig({
     site: 'https://dynamia.tools',
     integrations: [
         starlight({
+            plugins: [starlightLinksValidator({exclude: ['http://localhost:8080', 'http://localhost:8080/**']})],
             title: 'DynamiaTools',
             logo: {
                 light: './src/assets/dynamia-tools-light.svg',
