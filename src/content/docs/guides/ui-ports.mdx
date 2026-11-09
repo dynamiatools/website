@@ -1,0 +1,233 @@
+---
+title: UI Ports for Actions
+description: Talk to the user from an action without importing ZK — messages, questions, entity pickers, file previews, clipboard and navigation work the same in ZK and in remote clients.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+An action often needs to talk to the user: show a message, ask a question, let them pick a record,
+preview a PDF or open another page. In Dynamia Platform you do that through **UI ports**: small
+static facades in the `tools.dynamia.ui` package that do not depend on ZK.
+
+The same action then works in the ZK UI and in remote clients such as the Vue frontend
+(`@dynamia-tools/vue`), because every port has an adapter for each front end.
+
+<Aside type="note" title="Version">
+`UINavigation.openPage` and `refresh`, `UIChoices.pickEntity`, `UIClipboard`, `UIFiles.preview` and
+`UIMessages.showInput` are available in Dynamia Platform **26.11.0**.
+</Aside>
+
+## The facades
+
+| Facade | What it is for |
+|---|---|
+| `UIMessages` | Messages, yes/no questions and single-value input dialogs |
+| `UIChoices` | Choose one or many items from a list, or pick an entity through a lookup |
+| `UIFiles` | Download, preview, upload files |
+| `UIClipboard` | Copy text to the user's clipboard |
+| `UINavigation` | Open a URL, open a page of the application, refresh the current view |
+
+## Ask for a value: `UIMessages.showInput`
+
+`showInput` shows a small dialog with the component that fits the value class: a date picker for
+dates, a number box for numbers, and so on. The callback receives the value, or `null` when the user
+leaves it empty.
+
+```java
+UIMessages.showInput("Report from", java.time.LocalDate.class, from -> {
+    // build the report starting at 'from'
+});
+
+// With a default value
+UIMessages.showInput("Copies", Integer.class, 1, copies -> print(copies));
+```
+
+You can also ask for a `tools.dynamia.commons.LocalDateRange` to let the user pick a start and an
+end date in a single dialog:
+
+```java
+import tools.dynamia.commons.LocalDateRange;
+import tools.dynamia.ui.UIMessages;
+
+UIMessages.showInput("Sales period", LocalDateRange.class, range -> {
+    // range is a LocalDateRange (null when the user leaves it empty)
+});
+```
+
+## Pick an entity: `UIChoices.pickEntity`
+
+`pickEntity` opens a searchable selector over a named **lookup**. A lookup is a Spring bean that
+implements `EntityLookup<T>`; the facade finds it by its `name()`.
+
+```java
+//mybookstore/lookups/AuthorLookup.java
+package mybookstore.lookups;
+
+import java.util.List;
+import java.util.Optional;
+import org.springframework.stereotype.Component;
+import tools.dynamia.ui.EntityLookup;
+
+@Component
+public class AuthorLookup implements EntityLookup<Author> {
+
+    private final AuthorRepository repository;
+
+    public AuthorLookup(AuthorRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public String name() {
+        return "authors"; // the name used by UIChoices.pickEntity
+    }
+
+    @Override
+    public boolean isSearchable() {
+        return true; // the selector sends the typed text to search(...)
+    }
+
+    @Override
+    public List<Author> search(String text, int limit) {
+        // limit never exceeds EntityLookup.MAX_LIMIT (50)
+        return repository.searchByName(text, limit);
+    }
+
+    @Override
+    public Optional<Author> find(String key) {
+        return repository.findById(Long.valueOf(key));
+    }
+
+    @Override
+    public String key(Author author) {
+        return String.valueOf(author.getId());
+    }
+
+    @Override
+    public String label(Author author) {
+        return author.getName();
+    }
+}
+```
+
+Use it from an action:
+
+```java
+UIChoices.<Author>pickEntity("authors", "Choose the author", author -> {
+    book.setAuthor(author);
+    crudService.save(book);
+});
+```
+
+If no `EntityLookup` has that name, `pickEntity` throws `IllegalArgumentException`.
+
+For a fixed list of options use `chooseOne` or `chooseMany`:
+
+```java
+UIChoices.chooseOne("Export format", List.of("PDF", "Excel", "CSV"), format -> export(format));
+```
+
+## Preview a file: `UIFiles.preview`
+
+`UIFiles.download` saves a file; `UIFiles.preview` shows it to the user instead. Only PDF, common
+images (PNG, JPEG, GIF, WebP) and plain text are shown inline. Any other type is downloaded
+automatically, so it is safe to call it with any content.
+
+```java
+// From memory
+UIFiles.preview("invoice-1001.pdf", "application/pdf", pdfBytes);
+
+// From the file system
+UIFiles.preview(Path.of("/var/reports/summary.pdf"), "application/pdf");
+```
+
+## Copy to the clipboard: `UIClipboard.copy`
+
+```java
+UIClipboard.copy(book.getIsbn());
+UIMessages.showMessage("ISBN copied", MessageType.INFO);
+```
+
+Browsers only let a page write the clipboard after a user gesture. If the write is refused, the
+client shows the text in a dialog with a copy button, so the text always reaches the user.
+
+## Navigate: `UINavigation`
+
+| Method | Effect |
+|---|---|
+| `open(url)` | Open a URL |
+| `openInNewWindow(url)` | Open a URL in a new window or tab |
+| `openPage(path)` / `openPage(path, params)` | Open a page of the application (a `CrudPage` path) |
+| `refresh()` | Reload the current CRUD view |
+
+`openPage` is for pages of your application, not URLs. A value that is not a page path throws
+`IllegalArgumentException`. Parameter values must be `String`, `Number` or `Boolean`.
+
+```java
+UINavigation.openPage("/books", Map.of("status", "OUT_OF_STOCK"));
+UINavigation.refresh();
+```
+
+## Read the selection
+
+Inside a CRUD action, `CrudControllerAPI.getSelection()` returns the rows the user selected:
+
+```java
+@Override
+public void actionPerformed(CrudActionEvent evt) {
+    List<Book> selected = evt.getController().getSelection();
+    // ...
+}
+```
+
+## A complete action
+
+```java
+//mybookstore/actions/CopyIsbnAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIClipboard;
+import tools.dynamia.ui.UIMessages;
+
+@InstallAction
+public class CopyIsbnAction extends AbstractCrudAction {
+
+    public CopyIsbnAction() {
+        setName("Copy ISBN");
+        setImage("copy");
+        setApplicableClass(Book.class);
+        setMenuSupported(true); // acts on one record: listed in the row menu
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        if (evt.getData() instanceof Book book && book.getIsbn() != null) {
+            UIClipboard.copy(book.getIsbn());
+            UIMessages.showMessage("ISBN copied", MessageType.INFO);
+        } else {
+            UIMessages.showMessage("This book has no ISBN", MessageType.WARNING);
+        }
+    }
+}
+```
+
+## Check what the current front end supports
+
+Not every front end implements every port. Ask before you rely on one:
+
+```java
+if (UIPlatform.supports(ChoicesProvider.class)) {
+    UIChoices.pickEntity("authors", "Choose the author", this::assign);
+}
+```
+
+## Related
+
+- [How Actions Work](/guides/actions) — registering and organizing actions.
+- [Frontend SDK](/frontend-sdk) and [Vue Support](/vue-support) — the remote clients that render these ports.
+- [Quick Reference](/reference/quick-reference) — one-page cheat sheet.
