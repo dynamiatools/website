@@ -8,6 +8,20 @@ import {Card} from "@astrojs/starlight/components";
 DynamiaTools is built around several key concepts that facilitate the development of modular, maintainable, and scalable
 web applications. Understanding these concepts is crucial for effectively utilizing the framework.
 
+## How the pieces fit
+
+```text
+ Module (ModuleProvider)
+   └─ PageGroup
+        └─ Page ──────────────► CrudPage ── view descriptor (YAML) ──► form / table / tree
+                                    │
+                                    ├─ Actions (@InstallAction) ── UI ports (UIMessages, UIChoices ...)
+                                    └─ CrudService ──► Entity (JPA) ──► database
+```
+
+A module registers pages, a `CrudPage` binds an entity to its views, and the framework serves the same
+page in ZK and as a REST API for remote clients such as the Vue frontend.
+
 ## Modules
 Modules are the fundamental building blocks of a DynamiaTools application. Each module encapsulates a distinct set of
 functionalities or features, promoting modularity, reusability, and separation of concerns. Modules can be developed,
@@ -218,3 +232,10 @@ These helper classes are optional but can significantly enhance productivity and
 ## Versioning (CalVer)
 
 Since version 26.x, DynamiaTools uses Calendar Versioning (`YY.MM.MINOR`, e.g. `26.11.0` = year 2026, month 11, release 0) instead of traditional semantic versioning, and the core platform, extensions, and themes all share a single unified version. See [History](/history) for the full story behind this change.
+
+## Related
+
+- [Entities](/guides/entities), [Crud Service](/guides/crud-service) and [Navigation](/guides/navigation)
+- [View Descriptors](/view-descriptors) and [How Actions Work](/guides/actions)
+- [UI Ports for Actions](/guides/ui-ports) — write actions that run in ZK and in remote clients.
+- [Release Notes](/reference/release-notes) — what changed in each version.

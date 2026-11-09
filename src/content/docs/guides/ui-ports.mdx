@@ -17,6 +17,21 @@ The same action then works in the ZK UI and in remote clients such as the Vue fr
 `UIMessages.showInput` are available in Dynamia Platform **26.11.0**.
 </Aside>
 
+## One action, several front ends
+
+```text
+ Action ──► UIMessages / UIChoices / UIFiles / UIClipboard / UINavigation
+                         │
+            ┌────────────┴─────────────┐
+            ▼                          ▼
+      ZK adapter                 Replay adapter
+   (widgets, windows)     (REST: the action runs again from the
+                           start on each answer of the user)
+                                      │
+                                      ▼
+                         Vue and other remote clients
+```
+
 ## The facades
 
 | Facade | What it is for |
