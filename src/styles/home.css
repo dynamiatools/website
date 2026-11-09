@@ -246,6 +246,7 @@
 
 .dh-install {
 	display: inline-flex;
+	align-self: center;
 	align-items: center;
 	gap: 0.75rem;
 	max-width: 100%;
