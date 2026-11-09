@@ -49,23 +49,51 @@ export default defineConfig({
                 {
                     label: 'Start Here',
                     translations: {
-                        'es': 'Comieza Aqui'
+                        es: 'Comienza Aquí'
                     },
                     items: [
                         'getting-started',
                         'key-concepts',
-                        'custom-setup',
-                        'view-descriptors',
-                        'frontend-sdk',
-                        'vue-support'
+                        'custom-setup'
                     ]
                 },
                 {
-                    label: 'Guides',
+                    label: 'Domain & Data',
                     translations: {
-                        es: 'Guías',
+                        es: 'Dominio y Datos'
                     },
-                    autogenerate: {directory: 'guides'},
+                    items: [
+                        'guides/entities',
+                        'guides/crud-service',
+                        'guides/crud-listeners',
+                        'guides/validators',
+                        'guides/converters'
+                    ]
+                },
+                {
+                    label: 'Screens & Actions',
+                    translations: {
+                        es: 'Pantallas y Acciones'
+                    },
+                    items: [
+                        'view-descriptors',
+                        'guides/view-customizers',
+                        'guides/navigation',
+                        'guides/actions',
+                        'guides/ui-ports',
+                        'guides/list-filters'
+                    ]
+                },
+                {
+                    label: 'Frontend',
+                    translations: {
+                        es: 'Frontend'
+                    },
+                    items: [
+                        'frontend-sdk',
+                        'vue-support',
+                        'guides/microfrontends'
+                    ]
                 },
                 {
                     label: 'Extensions',
@@ -81,6 +109,7 @@ export default defineConfig({
                     },
                     items: [
                         'reference/quick-reference',
+                        'guides/development-patterns',
                         'reference/release-notes'
                     ]
                 },
