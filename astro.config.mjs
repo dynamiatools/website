@@ -140,7 +140,7 @@ export default defineConfig({
                     translations: {
                         es: 'Extensiones',
                     },
-                    autogenerate: {directory: 'extensions'},
+                    items: [{autogenerate: {directory: 'extensions'}}],
                 },
                 {
                     label: 'Reference',

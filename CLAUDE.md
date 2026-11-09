@@ -7,9 +7,9 @@ This is the official documentation website for **Dynamia Platform** (https://dyn
 **Current Version**: 26.11.0 (CalVer: YY.MM.MINOR - November 2026)
 
 The website is built using:
-- **Astro** (v5.18.2+) - Static site generator
-- **Starlight** (v0.37.7+, with starlight-links-validator: broken links fail the build) - Documentation theme for Astro
-- **TypeScript** (v5.9+)
+- **Astro** (v7.4.7+, Node 22.23.4+) - Static site generator
+- **Starlight** (v0.42.10+, with starlight-links-validator: broken links fail the build) - Documentation theme for Astro
+- **TypeScript** (v6.0+; v7 is not supported by `@astrojs/check` yet)
 - **MDX** - For content with React components
 
 ## Claude Code / IntelliJ MCP Integration
@@ -37,6 +37,7 @@ website/
 │   │   │   ├── guides/     # Tutorial guides
 │   │   │   └── es/         # Spanish translations
 │   ├── content.config.ts   # Content collections config (Starlight loaders)
+│   ├── content/i18n/       # Optional UI string overrides (en.json, es.json)
 │   ├── assets/             # Images and static assets
 │   └── styles/
 │       └── custom.css      # Custom theme styles
