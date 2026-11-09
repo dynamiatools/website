@@ -80,7 +80,8 @@ export default defineConfig({
                         es: 'Referencia',
                     },
                     items: [
-                        'reference/quick-reference'
+                        'reference/quick-reference',
+                        'reference/release-notes'
                     ]
                 },
                 {

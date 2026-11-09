@@ -181,6 +181,11 @@ GET /api/saas/migration/jobs/abc-123/download
 
 The response of a completed export job is a ZIP archive named `Account42_20260614T100500.zip`.
 
+<Aside type="note" title="Fixed in 26.11.0">
+Export jobs are now finalized as the root tenant, so the result file is persisted and the download is
+no longer empty. If you saw an empty ZIP from `/download` on an earlier version, upgrade to 26.11.0.
+</Aside>
+
 ```http
 POST /api/saas/migration/jobs/import
 Content-Type: multipart/form-data
