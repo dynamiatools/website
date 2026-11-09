@@ -1,45 +1,351 @@
 ---
-title: Como funcionan las Actions
+title: Cómo funcionan las acciones
+description: Las acciones encapsulan comportamiento reutilizable (botones de barra, enlaces de tabla, operaciones masivas, trabajos largos) que Dynamia Platform descubre automáticamente con @InstallAction.
 ---
 
-Las **Actions** son un concepto central en DynamiaTools. Permiten encapsular comportamiento reutilizable en diferentes partes de la aplicacion: botones, menus, celdas de tabla, toolbars y mas.
+import { Card, CardGrid, Aside } from '@astrojs/starlight/components';
 
-## Definir una Action
+Las **acciones** son la unidad estándar de comportamiento ejecutable en Dynamia Platform. En lugar de
+conectar manejadores de clic a mano, escribes una clase pequeña que describe *qué* hace la acción y
+*dónde* aplica, la anotas con `@InstallAction`, y el framework se encarga de descubrirla, dibujarla como
+botón, ítem de menú o enlace, e invocarla cuando el usuario interactúa con ella.
 
-Normalmente defines una clase que extiende `AbstractCrudAction` o implementa `Action`.
+Las acciones aparecen en las barras de herramientas CRUD, en los enlaces de las filas de las tablas y en los
+menús de página, y también pueden exponerse como un endpoint público de ejecución
+(`Action.execute(ActionExecutionRequest)`) para flujos REST o headless.
+
+## La jerarquía de acciones
+
+| Clase base / interfaz          | Úsala para                                                                 |
+|--------------------------------|-----------------------------------------------------------------------------|
+| `Action`                       | El contrato raíz: id, nombre, imagen, `isEnabled()`, `isVisible()`, `actionPerformed`. Rara vez se implementa directamente. |
+| `AbstractAction`                | Base cómoda con getters y setters ya implementados. Buena para acciones independientes no ligadas a una entidad. |
+| `ApplicationGlobalAction`       | Acciones globales de toda la aplicación, siempre disponibles sin importar el contexto (ayuda, configuración, utilidades tipo cerrar sesión). |
+| `CrudAction` / `AbstractCrudAction` | Acciones de las vistas CRUD: barras de tabla, enlaces de fila, botones de formulario. Agrega `setApplicableClass` y `getApplicableStates()`. |
+
+En la práctica extenderás `AbstractAction` para una acción genérica y `AbstractCrudAction` para cualquier
+cosa ligada a la tabla o al formulario de una entidad.
+
+## Registrar una acción: `@InstallAction`
+
+`@InstallAction` marca la clase como un **bean de Spring con ámbito prototype**. El framework escanea el
+contexto al arrancar, crea una instancia por uso y la deja disponible para las barras, los menús y los
+campos `link` de los [descriptores de vista](/es/view-descriptors) por su `name`.
 
 ```java
+//demo/actions/HelpAction.java
 package demo.actions;
 
 import tools.dynamia.actions.AbstractAction;
 import tools.dynamia.actions.ActionEvent;
+import tools.dynamia.actions.ApplicationGlobalAction;
 import tools.dynamia.actions.InstallAction;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
 
 @InstallAction
-public class PrintHelloAction extends AbstractCrudAction {
+public class HelpAction extends ApplicationGlobalAction {
 
-    public PrintHelloAction() {
-        setId("PrintHelloAction");
-        setName("Say Hello");
-        setApplicableClass(Person.class); // Opcional: limita esta accion a entidades Person
+    public HelpAction() {
+        setId("HelpAction");
+        setName("Help");
+        setImage("help");
     }
 
     @Override
-    public void actionPerformed(CrudActionEvent evt) {
-        System.out.println("Hello from Dynamia Action");
+    public void actionPerformed(ActionEvent evt) {
+        UIMessages.showMessage("Visit https://dynamia.tools for documentation.", MessageType.INFO);
     }
 }
 ```
 
-## Registrar y usar la Action
+Como `ApplicationGlobalAction` extiende `AbstractAction`, no hace falta nada más que la anotación: la acción
+queda disponible en toda la aplicación en cuanto carga el contexto.
 
-Con `@InstallAction`, Dynamia la detecta automaticamente en el contexto Spring.
+## Acciones de entidades CRUD
 
+Una acción de entidad extiende `AbstractCrudAction` y se limita a una clase con `setApplicableClass(...)`.
+Dentro de `actionPerformed`, la fila o entidad actual llega por `CrudActionEvent`, que extiende `ActionEvent`
+y además expone el `CrudControllerAPI` del CRUD (`evt.getController()`) para refrescar la consulta, leer la
+selección actual o fijar parámetros de filtro.
+
+```java
+//mybookstore/actions/MarkOutOfStockAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import mybookstore.domain.StockStatus;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
+
+@InstallAction
+public class MarkOutOfStockAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public MarkOutOfStockAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("MarkOutOfStockAction");
+        setName("Mark Out of Stock");
+        setApplicableClass(Book.class);
+        setImage("warning");
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        Book book = (Book) evt.getData();
+        if (book == null) {
+            UIMessages.showMessage("Please select a book first.", MessageType.WARNING);
+            return;
+        }
+        book.setStockStatus(StockStatus.OUT_OF_STOCK);
+        crudService.save(book);
+        UIMessages.showMessage("Book marked as out of stock.", MessageType.SUCCESS);
+    }
+}
+```
+
+`evt.getData()` trae el bean de la fila cuando la acción se dispara desde un enlace de tabla o una fila
+seleccionada; `evt.getController().getEntity()` da la entidad cargada en el formulario. Ambos son válidos
+según dónde esté ligada la acción: usa el que corresponda a la vista donde la adjuntaste.
+
+<Aside type="tip">
+Mantén `actionPerformed` delgado: valida el contexto, delega la mutación real a un `@Service` de Spring y usa
+`UIMessages` para dar retroalimentación. Así la acción sigue siendo reutilizable si luego disparas la misma
+lógica desde un planificador o un endpoint REST.
+</Aside>
+
+## Acciones masivas
+
+La misma forma de `AbstractCrudAction` sirve para operaciones masivas; la diferencia está solo en lo que haces
+con la selección dentro de `actionPerformed`. Cuando está ligada a una tabla de selección múltiple, recorre las
+filas afectadas e informa un solo mensaje resumen en lugar de un mensaje por fila:
+
+```java
+//mybookstore/actions/BulkDiscountAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.ui.MessageType;
+import tools.dynamia.ui.UIMessages;
+
+import java.util.List;
+
+@InstallAction
+public class BulkDiscountAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public BulkDiscountAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("BulkDiscountAction");
+        setName("Apply 10% Discount");
+        setApplicableClass(Book.class);
+        setImage("percent");
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void actionPerformed(CrudActionEvent evt) {
+        List<Book> selected = (List<Book>) evt.getData();
+        if (selected == null || selected.isEmpty()) {
+            UIMessages.showMessage("Select at least one book.", MessageType.WARNING);
+            return;
+        }
+
+        selected.forEach(book -> {
+            book.setDiscount(10.0);
+            crudService.save(book);
+        });
+        UIMessages.showMessage(selected.size() + " book(s) updated.", MessageType.SUCCESS);
+    }
+}
+```
+
+## Acciones de larga duración
+
+Para operaciones que recorren muchos registros (reindexar, importar, recalcular), bloquea lo menos posible el
+hilo de la interfaz y da retroalimentación de progreso con `LongOperationMonitorWindow`. Ejecuta el callback
+fuera del hilo de la petición y expone una API `increment()`/`isStopped()` para que el usuario pueda cancelar:
+
+```java
+//mybookstore/actions/ReindexBooksAction.java
+package mybookstore.actions;
+
+import mybookstore.domain.Book;
+import tools.dynamia.actions.InstallAction;
+import tools.dynamia.crud.AbstractCrudAction;
+import tools.dynamia.crud.CrudActionEvent;
+import tools.dynamia.domain.ValidationError;
+import tools.dynamia.domain.services.CrudService;
+import tools.dynamia.zk.ui.LongOperationMonitorWindow;
+
+import java.util.List;
+
+@InstallAction
+public class ReindexBooksAction extends AbstractCrudAction {
+
+    private final CrudService crudService;
+
+    public ReindexBooksAction(CrudService crudService) {
+        this.crudService = crudService;
+        setId("ReindexBooksAction");
+        setName("Reindex Books");
+        setApplicableClass(Book.class);
+        setImage("refresh");
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        LongOperationMonitorWindow.start("Reindexing books...", "Done", monitor -> {
+            List<Book> books = crudService.findAll(Book.class);
+            monitor.setMax(books.size());
+
+            for (Book book : books) {
+                monitor.setMessage("Processing: " + book.getTitle());
+                reindex(book);
+                monitor.increment();
+
+                if (monitor.isStopped()) {
+                    throw new ValidationError("Reindex cancelled by user.");
+                }
+            }
+        });
+    }
+
+    private void reindex(Book book) {
+        // tu lógica de reindexación
+    }
+}
+```
+
+## Visibilidad y habilitación condicionales
+
+`Action` expone `isEnabled()` e `isVisible()` (ambos sin argumentos). Sobrescríbelos para condiciones que
+aplican a la acción completa (banderas de funcionalidad, licencias o el rol del usuario actual), que se
+evalúan cuando la acción se dibuja:
+
+```java
+@Override
+public boolean isVisible() {
+    return securityService.hasRole("MANAGER");
+}
+
+@Override
+public boolean isEnabled() {
+    return featureFlags.isEnabled("bulk-discounts");
+}
+```
+
+Para condiciones que dependen de la **fila o entidad concreta** (un estado, el valor de un campo), verifica
+dentro del propio `actionPerformed` y sal temprano con un `UIMessages.showMessage(...,
+MessageType.WARNING)`. Es el patrón de `MarkOutOfStockAction` arriba, y mantiene la regla de habilitar o
+deshabilitar junto a la lógica que depende de ella, en lugar de duplicar la condición en dos lugares.
+
+## Controlar las acciones estándar desde YAML
+
+Las acciones CRUD incluidas en el framework (`NewAction`, `EditAction`, `DeleteAction`, `FindAction`,
+`ExportAction`, ...) y tus acciones personalizadas pueden activarse o desactivarse por vista sin tocar Java,
+desde la sección `actions` de un [descriptor de vista](/es/view-descriptors):
+
+```yaml
+# BookCrud.yml
+actions:
+  DeleteAction:
+    enabled: false          # oculta o deshabilita el botón de eliminar incluido
+
+  ReindexBooksAction:       # referencia tu acción personalizada por su `name`
+    enabled: true
+```
+
+## Publicar acciones a clientes remotos: `@RunsOn`
+
+Un cliente remoto, como el frontend Vue, solo ve las acciones que el servidor publica en los metadatos de
+acciones. Lo decides **para cada clase concreta** con `@RunsOn`:
+
+```java
+@InstallAction
+@RunsOn(ActionRuntime.HEADLESS)
+public class ApproveOrderAction extends AbstractCrudAction {
+    // usa UIMessages, UIChoices, UIFiles ... y ninguna clase de ZK
+}
+```
+
+La anotación se lee solo de la clase concreta. Una subclase no la hereda, así que cada acción se publica a
+propósito.
+
+| `ActionRuntime` | Significado |
+|---|---|
+| `HEADLESS` | Una acción local escrita contra los [puertos de UI](/es/guides/ui-ports). El servidor la ejecuta y un cliente remoto la maneja respondiendo sus preguntas paso a paso |
+| `FLOW` | Un `FlowRemoteAction`: una máquina de estados explícita en el servidor |
+| `REMOTE` | Un `RemoteAction` simple: una petición, una respuesta |
+| `FRONTEND` | Comportamiento propio de cada frontend (cuadro de búsqueda, panel de filtros, pantallas ZK). Está en el catálogo pero no tiene endpoint y el servidor nunca la ejecuta |
+| `UNDECLARED` | Nadie la declaró y no se puede derivar: no se publica |
+
+Un cliente remoto llama a una acción headless por su id: por defecto el nombre de la clase sin el sufijo
+`Action`, en minúsculas (`DeleteAction` pasa a ser `delete`).
+
+<Aside type="caution" title="HeadlessCapable está obsoleta">
+Antes de la 26.11.0 una acción se habilitaba implementando `HeadlessCapable`. Esa interfaz está obsoleta:
+declara `@RunsOn(ActionRuntime.HEADLESS)` en la clase concreta. Su método `headlessSupported()` sigue
+funcionando como veto dinámico mientras la interfaz exista.
+</Aside>
+
+Una acción headless se ejecuta de nuevo desde el inicio cada vez que el usuario responde una pregunta, y solo
+se confirma la última ejecución. Mantén el código previo a una interacción libre de efectos secundarios que no
+sean escrituras en base de datos.
+
+## Menú de fila y orden
+
+Las acciones CRUD pueden pedir aparecer en el menú de fila (el menú «más» de cada registro) con
+`setMenuSupported(true)`, y pueden ordenarse con `setPosition(...)`; las posiciones menores van primero y el
+valor por defecto es `0`. Ambos valores se publican en los metadatos de la acción como `menuSupported` y
+`position`.
+
+```java
+public CopyIsbnAction() {
+    setName("Copy ISBN");
+    setApplicableClass(Book.class);
+    setMenuSupported(true); // actúa sobre un registro: aparece en el menú de la fila
+    setPosition(10);        // después de las acciones con una posición menor
+}
+```
+
+El CRUD de Vue muestra la acción principal de una fila como botón y lista en el menú de fila solo las acciones
+con `menuSupported`, ordenadas por `position`.
 
 ## Recomendaciones
 
-- Usa nombres de accion estables (`setName`) para referenciarlas desde YAML.
-- Mueve logica de negocio a servicios Spring e invocalos desde la action.
-- Evita actions demasiado grandes; divide por responsabilidad.
-- Agrega validaciones de contexto cuando la action dependa de una fila o entidad seleccionada.
+<CardGrid>
+    <Card title="Nombres estables" icon="pencil">
+        Usa valores consistentes en `setId` y `setName`: así los referencian los descriptores YAML y el resto del
+        código.
+    </Card>
+    <Card title="Acciones delgadas" icon="approve-check">
+        Lleva la lógica de negocio a un `@Service` de Spring. La acción debe orquestar, no implementar.
+    </Card>
+    <Card title="Falla fuerte, falla temprano" icon="warning">
+        Valida primero la selección y el contexto, y retorna con una advertencia clara de `UIMessages` en lugar
+        de lanzar una excepción en lo profundo de la lógica.
+    </Card>
+    <Card title="Una responsabilidad" icon="setting">
+        Divide las acciones grandes que «lo hacen todo» en otras más pequeñas: las reglas de
+        `isVisible`/`isEnabled` se mantienen simples y cada acción se prueba por separado.
+    </Card>
+</CardGrid>
 
+## Relacionado
+
+- [Puertos de UI para acciones](/es/guides/ui-ports) — mensajes, preguntas, selectores, vistas previas y navegación que funcionan en ZK y en clientes remotos.
+- [Filtros y consultas de listas](/es/guides/list-filters) — filtros portables de la barra con `FilterAction`.
+- [Descriptores de vista](/es/view-descriptors) — controla la disponibilidad de las acciones por vista con la sección `actions`.
+- [Crud Service](/es/guides/crud-service) — la API de persistencia a la que delegan la mayoría de las acciones.
+- [Crud Listeners](/es/guides/crud-listeners) — para lógica que debe ejecutarse en cada creación, actualización o eliminación sin importar qué acción la disparó.

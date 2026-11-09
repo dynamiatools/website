@@ -87,6 +87,38 @@ const booksApi = client.crud('library/books');
 const page = await booksApi.findAll({ page: 1, size: 20, q: 'clean code' });
 ```
 
+### Filtrar, buscar y ordenar con `find()`
+
+`findAll()` solo lee `page`, `size`, la búsqueda de texto `q` y el orden. Para filtrar por campo usa `find()`: envía un `QuerySpec` a `POST /api/{path}/find` y devuelve el mismo `CrudListResult<T>`.
+
+```typescript
+const result = await client.crud('library/books').find({
+  filters: [
+    { field: 'publishDate', op: 'between', value: ['2026-01-01', '2026-01-31'] },
+    { field: 'status', op: 'in', value: ['AVAILABLE', 'RESERVED'] },
+  ],
+  search: 'clean',                 // búsqueda de texto en los campos de texto visibles
+  sort: [{ field: 'title', dir: 'asc' }],
+  page: 1,                         // base 1
+  size: 20,
+});
+```
+
+Un `QuerySpec` tiene estas partes (todas opcionales):
+
+| Campo | Significado |
+|---|---|
+| `filters` | Lista de `{ field, op, value }`, máximo uno por campo |
+| `search` | Texto a buscar en los campos de texto visibles |
+| `sort` | Lista de `{ field, dir }`; `dir` es `asc` (por defecto) o `desc` |
+| `page` / `size` | Página (base 1) y tamaño de página |
+
+Operadores: `eq`, `like`, `between` (`[desde, hasta]`, un lado `null` queda abierto), `gte`, `lte`, `in` (una lista) e `isNull` (un booleano). Una fecha sin hora cubre todo el día de un campo que tiene hora.
+
+El servidor valida cada campo contra el descriptor de vista de la página. Un campo que el descriptor no tiene, un valor de tipo incorrecto o una consulta que supera los límites se rechaza con un `422` (`DynamiaApiError`), nunca se ignora en silencio. Los límites son 20 filtros, 100 valores en un `in`, 5 claves de orden, 200 caracteres de búsqueda y un tamaño de página de 500 (50 por defecto).
+
+`POST /api/{path}/find` y `crud(path).find()` están disponibles desde Dynamia Platform **26.11.0**. Para restringir en el servidor lo que un cliente puede consultar, registra un bean `QuerySpecFilter`; consulta [Filtros y consultas de listas](/es/guides/list-filters#filtros-de-consulta-en-el-servidor).
+
 ### Acciones globales y de entidad
 
 ```typescript

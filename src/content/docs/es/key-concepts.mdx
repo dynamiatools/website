@@ -7,6 +7,20 @@ import {Card} from "@astrojs/starlight/components";
 
 DynamiaTools está construido sobre varios conceptos clave que facilitan el desarrollo de aplicaciones web modulares, mantenibles y escalables. Comprender estos conceptos es fundamental para aprovechar eficazmente el framework.
 
+## Cómo encajan las piezas
+
+```text
+ Módulo (ModuleProvider)
+   └─ PageGroup
+        └─ Page ──────────────► CrudPage ── descriptor de vista (YAML) ──► formulario / tabla / árbol
+                                    │
+                                    ├─ Acciones (@InstallAction) ── Puertos de UI (UIMessages, UIChoices ...)
+                                    └─ CrudService ──► Entidad (JPA) ──► base de datos
+```
+
+Un módulo registra páginas, una `CrudPage` une una entidad con sus vistas, y el framework sirve la misma página
+en ZK y como API REST para clientes remotos como el frontend Vue.
+
 ## Módulos
 Los módulos son los bloques fundamentales de una aplicación DynamiaTools. Cada módulo encapsula un conjunto distinto de funcionalidades o características, promoviendo la modularidad, reutilización y separación de responsabilidades. Los módulos pueden desarrollarse, probarse y desplegarse de forma independiente, permitiendo arquitecturas de aplicaciones escalables y mantenibles.
 
@@ -170,3 +184,10 @@ Los servicios son componentes singleton que proveen funcionalidades o lógica de
 DynamiaTools ofrece un conjunto completo de clases y métodos utilitarios diseñados para simplificar tareas comunes de desarrollo. Estas utilidades incluyen manipulación de cadenas (`StringUtils`), manejo de fechas y horas (`DateTimeUtils`), operaciones de archivos (`IOUtils`, `ImageUtils`), transformaciones DTO (`Transportable`), parseo de JSON (`StringPojoParser`), operaciones con BigDecimal (`BigDecimalUtils`) y más.
 
 Estas clases auxiliares son opcionales pero pueden mejorar significativamente la productividad y calidad del código en tu aplicación o servicio.
+
+## Relacionado
+
+- [Entidades](/es/guides/entities), [Crud Service](/es/guides/crud-service) y [Navegación](/es/guides/navigation)
+- [Descriptores de vista](/es/view-descriptors) y [Cómo funcionan las acciones](/es/guides/actions)
+- [Puertos de UI para acciones](/es/guides/ui-ports) — escribe acciones que funcionan en ZK y en clientes remotos.
+- [Notas de versión](/es/reference/release-notes) — qué cambió en cada versión.

@@ -99,6 +99,12 @@ const activeNode = computed(() => currentPage.value);
 </template>
 ```
 
+## Acciones de fila y menú de fila
+
+`<DynamiaCrudPage>` muestra la acción principal de cada fila (editar) como botón y las demás acciones de fila en un menú «más». El menú lista solo las acciones que el servidor marca con `menuSupported`, ordenadas por `position`. Los filtros de la barra declarados con `FilterAction` y `Control` se dibujan como controles de fecha, elección o texto y se envían como filtros de `POST /find`.
+
+Consulta [Cómo funcionan las acciones](/es/guides/actions#menú-de-fila-y-orden) y [Filtros y consultas de listas](/es/guides/list-filters).
+
 ## Estado beta
 
 El alcance beta actual es ideal para:
