@@ -212,13 +212,53 @@
 }
 
 .dh-btn-primary {
-	background: var(--dh-green);
-	color: var(--dh-on-green);
+	position: relative;
+	overflow: hidden;
+	isolation: isolate;
+	color: #ffffff;
+	border-color: rgba(255, 255, 255, 0.22);
+	/* The logo gradient, a little darker at the green end so white text keeps 4.5:1 */
+	background: linear-gradient(120deg, #12804a 0%, #137a7a 48%, #155799 100%);
+	background-size: 190% 100%;
+	background-position: 0% 50%;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.32),
+		0 10px 28px -10px rgba(21, 87, 153, 0.8),
+		0 4px 14px -6px rgba(18, 128, 74, 0.75);
+	transition: background-position 0.55s ease, transform 0.18s ease, box-shadow 0.25s ease;
+}
+
+/* A band of light that crosses the button on hover, and once when the page loads */
+.dh-btn-primary::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	z-index: -1;
+	background: linear-gradient(105deg, transparent 34%, rgba(255, 255, 255, 0.42) 50%, transparent 66%);
+	transform: translateX(-125%);
+	pointer-events: none;
+}
+
+.dh-hero .dh-btn-primary::before {
+	animation: dh-shine 1.3s 1.8s ease both;
 }
 
 .dh-btn-primary:hover {
 	transform: translateY(-2px);
-	background: color-mix(in srgb, var(--dh-green) 88%, white);
+	background-position: 100% 50%;
+	box-shadow:
+		inset 0 1px 0 rgba(255, 255, 255, 0.4),
+		0 14px 34px -10px rgba(21, 87, 153, 0.95),
+		0 6px 18px -6px rgba(18, 128, 74, 0.9);
+}
+
+.dh-btn-primary:hover::before {
+	animation: dh-shine 0.85s ease;
+}
+
+.dh-btn-primary:active {
+	transform: translateY(0) scale(0.98);
+	transition-duration: 0.08s;
 }
 
 .dh-btn-secondary {
@@ -1240,6 +1280,12 @@
 @keyframes dh-rise {
 	from {
 		transform: translateY(105%);
+	}
+}
+
+@keyframes dh-shine {
+	to {
+		transform: translateX(125%);
 	}
 }
 
