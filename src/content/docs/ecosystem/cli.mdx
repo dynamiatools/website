@@ -51,9 +51,33 @@ The wizard asks:
 2. **Scaffold choice** — Backend + Frontend / Backend only / Frontend only
 3. **Backend language** — Java, Kotlin, or Groovy
 4. **Maven coordinates** — Group ID, Artifact ID, version, description
-5. **Frontend framework** — Vue 3 or React
+5. **Frontend framework** — Vue 3 (React is not available yet)
 6. **Package manager** — pnpm, npm, or yarn
 7. **Confirm** — a summary table before anything is generated
+
+### Flags for scripts and CI
+
+Every question has a flag. Pass them all with `--yes` to run without any prompt:
+
+```bash
+dynamia new --name my-erp --scaffold both --backend-lang java \
+  --group-id com.acme --artifact-id erp --frontend vue --pm pnpm --yes
+```
+
+| Flag | Values |
+|---|---|
+| `--name` | Project folder name (lowercase letters, numbers and hyphens) |
+| `--scaffold` | `both`, `backend` or `frontend` |
+| `--backend-lang` | `java`, `kotlin` or `groovy` |
+| `--group-id`, `--artifact-id`, `--version`, `--description` | Maven coordinates |
+| `--frontend` | `vue` |
+| `--pm` | `pnpm`, `npm` or `yarn` |
+| `--yes` | Accept the summary without asking |
+| `--no-git` | Do not initialize a Git repository |
+
+<Aside type="tip" title="Use it from Claude Code">
+The `dynamia-platform` plugin can install or update this CLI and create a project for you, always with flags and never through the interactive wizard. See [Build with Claude Code](/getting-started#build-with-claude-code).
+</Aside>
 
 ### What happens under the hood
 
@@ -75,10 +99,10 @@ The wizard asks:
 ```
 my-erp-app/
 ├── backend/     Spring Boot + Dynamia Tools (Java/Kotlin/Groovy)
-└── frontend/    Vue 3 or React + Vite + @dynamia-tools/vue|sdk
+└── frontend/    Vue 3 + Vite + @dynamia-tools/vue|sdk
 ```
 
-The backend is a standard Spring Boot project with the [DynamiaTools starter](/getting-started) already on the classpath — open it and start adding [entities and modules](/key-concepts) right away. The frontend is a Vite project pre-wired with the [SDK and Vue integration](/frontend-sdk) so it can talk to the generated backend's REST API immediately.
+The backend is a standard Spring Boot project with the [Dynamia Platform](/getting-started) already on the classpath — open it and start adding [entities and modules](/key-concepts) right away. The frontend is a Vite project pre-wired with the [SDK and Vue integration](/frontend-sdk) so it can talk to the generated backend's REST API immediately.
 
 <Aside type="tip">
   All versions, template repositories, and URLs the CLI uses live in a single `cli.properties` file inside the package — the CLI code never hardcodes a version or URL, so template repos and enabled/disabled stacks can evolve independently of a CLI release.

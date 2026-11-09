@@ -51,9 +51,33 @@ El asistente pregunta:
 2. **Tipo de scaffold** — Backend + Frontend / Solo backend / Solo frontend
 3. **Lenguaje del backend** — Java, Kotlin o Groovy
 4. **Coordenadas Maven** — Group ID, Artifact ID, versión, descripción
-5. **Framework de frontend** — Vue 3 o React
+5. **Framework de frontend** — Vue 3 (React aún no está disponible)
 6. **Gestor de paquetes** — pnpm, npm o yarn
 7. **Confirmación** — una tabla resumen antes de generar nada
+
+### Banderas para scripts y CI
+
+Cada pregunta tiene una bandera. Pásalas todas con `--yes` para ejecutar sin ninguna pregunta:
+
+```bash
+dynamia new --name my-erp --scaffold both --backend-lang java \
+  --group-id com.acme --artifact-id erp --frontend vue --pm pnpm --yes
+```
+
+| Bandera | Valores |
+|---|---|
+| `--name` | Nombre de la carpeta del proyecto (minúsculas, números y guiones) |
+| `--scaffold` | `both`, `backend` o `frontend` |
+| `--backend-lang` | `java`, `kotlin` o `groovy` |
+| `--group-id`, `--artifact-id`, `--version`, `--description` | Coordenadas Maven |
+| `--frontend` | `vue` |
+| `--pm` | `pnpm`, `npm` o `yarn` |
+| `--yes` | Acepta el resumen sin preguntar |
+| `--no-git` | No inicializa un repositorio Git |
+
+<Aside type="tip" title="Úsalo desde Claude Code">
+El plugin `dynamia-platform` puede instalar o actualizar este CLI y crear un proyecto por ti, siempre con banderas y nunca con el asistente interactivo. Consulta [Construye con Claude Code](/es/getting-started#construye-con-claude-code).
+</Aside>
 
 ### Qué pasa por dentro
 
@@ -75,10 +99,10 @@ El asistente pregunta:
 ```
 my-erp-app/
 ├── backend/     Spring Boot + Dynamia Tools (Java/Kotlin/Groovy)
-└── frontend/    Vue 3 o React + Vite + @dynamia-tools/vue|sdk
+└── frontend/    Vue 3 + Vite + @dynamia-tools/vue|sdk
 ```
 
-El backend es un proyecto Spring Boot estándar con el [starter de DynamiaTools](/es/getting-started) ya en el classpath — ábrelo y empieza a agregar [entidades y módulos](/es/key-concepts) de inmediato. El frontend es un proyecto Vite preconfigurado con el [SDK y la integración con Vue](/es/frontend-sdk) para poder comunicarse con la API REST del backend generado de inmediato.
+El backend es un proyecto Spring Boot estándar con el [Dynamia Platform](/es/getting-started) ya en el classpath — ábrelo y empieza a agregar [entidades y módulos](/es/key-concepts) de inmediato. El frontend es un proyecto Vite preconfigurado con el [SDK y la integración con Vue](/es/frontend-sdk) para poder comunicarse con la API REST del backend generado de inmediato.
 
 <Aside type="tip">
   Todas las versiones, repositorios de plantillas y URLs que usa el CLI viven en un único archivo `cli.properties` dentro del paquete — el código del CLI nunca hardcodea una versión o URL, así que los repositorios de plantillas y los stacks habilitados/deshabilitados pueden evolucionar de forma independiente a una versión del CLI.

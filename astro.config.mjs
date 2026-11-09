@@ -93,6 +93,7 @@ export default defineConfig({
                     },
                     items: [
                         'getting-started',
+                        'ecosystem/cli',
                         'key-concepts',
                         'custom-setup'
                     ]
@@ -163,11 +164,6 @@ export default defineConfig({
                             label: 'Buckie — File Server',
                             translations: { es: 'Buckie — Servidor de Archivos' },
                             link: 'buckie/',
-                        },
-                        {
-                            label: 'CLI',
-                            translations: { es: 'CLI' },
-                            link: 'ecosystem/cli',
                         },
                         {
                             label: 'Templates & Themes',

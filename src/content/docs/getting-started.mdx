@@ -1,358 +1,295 @@
 ---
 title: Getting Started
-description: "Build your first Dynamia Platform application in minutes: a Spring Boot project with an entity, automatic CRUD screens and REST endpoints."
+description: "Create a Dynamia Platform project with the CLI in minutes: a Spring Boot backend in Java, Kotlin or Groovy and a Vue 3 frontend, running on your machine."
 ---
 
-import {Aside} from '@astrojs/starlight/components';
+import { Aside, Steps, Tabs, TabItem, FileTree, Code, LinkCard, CardGrid } from '@astrojs/starlight/components';
+import { dynamiaToolsVersion } from '../../../astro.config.mjs';
 
+This guide takes you from nothing to a running application: a Spring Boot backend with the platform already wired in, and a Vue 3 frontend that talks to it. Then you add your first entity and see the screen and the REST API appear.
 
-## Installation
+The fastest way to start is the **Dynamia CLI**. If you already have a Spring Boot project, jump to [add Dynamia to an existing project](#add-dynamia-to-an-existing-project).
 
-1. Create a new SpringBoot project using https://start.spring.io and select Web, JPA and a programing language for your Spring Boot app.
-DynamiaTools is compatible with Java, Groovy and Kotlin
+<Aside type="note" title="What you need">
+Node.js 24 or newer, Git and JDK 25. On Linux and macOS the one-line installer sets up the JDK and Node.js for you.
+</Aside>
 
-<Aside>You can [click
-    here](https://start.spring.io/#!type=maven-project&language=java&packaging=jar&jvmVersion=21&groupId=com.example&artifactId=dynamia-tools-project&name=Dynaima&description=Demo%20project%20for%20Spring%20Boot&packageName=com.example.demo&dependencies=web,data-jpa,h2)
-    to get a preconfigured Spring Boot project with Java, Maven and Web with JPA support.</Aside>
+## Create a project with the CLI
 
-2. Download and import it in your IDE
-3. Add DynamiaTools starter dependency.
+<Steps>
 
-**Maven**
+1. **Install the CLI.**
 
-```xml
-<!--pom.xml-->
-<dependencies>
+   <Tabs>
+     <TabItem label="One line (Linux and macOS)">
+       Installs JDK 25, Node.js and the CLI:
+
+       ```bash
+       curl -fsSL https://get.dynamia.tools | bash
+       ```
+     </TabItem>
+     <TabItem label="npm">
+       If you already have Node.js 24+, Git and JDK 25:
+
+       ```bash
+       npm install -g @dynamia-tools/cli
+       ```
+     </TabItem>
+   </Tabs>
+
+2. **Create the project.**
+
+   ```bash
+   dynamia new
+   ```
+
+   The wizard asks for the project name, what to generate (backend, frontend or both), the backend language (**Java**, **Kotlin** or **Groovy**), your Maven coordinates, the frontend (**Vue 3**) and your package manager. It shows a summary before it generates anything.
+
+3. **Run it.** The CLI creates two folders:
+
+   <FileTree>
+
+   - my-erp
+     - backend Spring Boot with Dynamia Platform
+     - frontend Vue 3, Vite and @dynamia-tools/vue
+
+   </FileTree>
+
+   ```bash
+   cd my-erp/backend && ./mvnw spring-boot:run     # backend on http://localhost:8080
+   cd my-erp/frontend && pnpm dev                  # frontend (use npm or yarn if you chose them)
+   ```
+
+   The backend includes Spring Data JPA with an in-memory database, so it runs without any setup.
+
+</Steps>
+
+<Aside type="tip" title="Scripts and CI">
+Pass flags to skip every prompt:
+
+```bash
+dynamia new --name my-erp --scaffold both --backend-lang kotlin \
+  --group-id com.acme --artifact-id erp --frontend vue --pm pnpm --yes
+```
+
+See the [CLI reference](/ecosystem/cli) for every flag. The CLI is in beta: when a template is not ready you get a clear message with a support code instead of a broken project.
+</Aside>
+
+## Add your first entity
+
+Dynamia has one idea at its center: your domain model drives everything else. Three small steps give you a complete screen and a REST API. The examples are Java; the same classes work in Kotlin and Groovy.
+
+<Steps>
+
+1. **Model your domain.** A plain JPA entity. Extend `BaseEntity` to get the id, audit fields and CRUD support.
+
+   ```java
+   //backend/src/main/java/com/acme/erp/library/Book.java
+   package com.acme.erp.library;
+
+   import jakarta.persistence.Entity;
+   import jakarta.validation.constraints.NotEmpty;
+   import tools.dynamia.domain.jpa.BaseEntity;
+
+   import java.math.BigDecimal;
+
+   @Entity
+   public class Book extends BaseEntity {
+
+       @NotEmpty
+       private String title;
+       private String author;
+       private BigDecimal price;
+
+       // getters and setters
+   }
+   ```
+
+2. **Describe the screens.** A YAML view descriptor declares each view. No templates and no boilerplate.
+
+   ```yaml
+   # backend/src/main/resources/META-INF/descriptors/BookForm.yml
+   view: form
+   beanClass: com.acme.erp.library.Book
+   fields:
+     title:
+     author:
+     price:
+   ```
+
+   ```yaml
+   # backend/src/main/resources/META-INF/descriptors/BookTable.yml
+   view: table
+   beanClass: com.acme.erp.library.Book
+   fields:
+     title:
+     author:
+     price:
+   ```
+
+3. **Put it in the navigation.** A module places the entity in your app with one line.
+
+   ```java
+   //backend/src/main/java/com/acme/erp/library/LibraryModuleProvider.java
+   package com.acme.erp.library;
+
+   import tools.dynamia.crud.CrudPage;
+   import tools.dynamia.integration.sterotypes.Provider;
+   import tools.dynamia.navigation.Module;
+   import tools.dynamia.navigation.ModuleProvider;
+
+   @Provider
+   public class LibraryModuleProvider implements ModuleProvider {
+
+       @Override
+       public Module getModule() {
+           return new Module("library", "Library")
+                   .addPage(new CrudPage("books", "Books", Book.class));
+       }
+   }
+   ```
+
+</Steps>
+
+Restart the backend. You now have a **Library** menu with a **Books** page: list, search, create, edit and delete, with validation. The module and page ids define the path, so the same page is `library/books`.
+
+## See the REST API
+
+Every `CrudPage` gets a REST endpoint, with no extra code. Create a few books and open `http://localhost:8080/api/library/books`:
+
+```json
+{
+  "data": [
+    { "id": 1, "title": "Clean Code", "author": "Robert C. Martin", "price": 42.00 },
+    { "id": 2, "title": "Effective Java", "author": "Joshua Bloch", "price": 45.00 }
+  ],
+  "pageable": { "totalSize": 2, "pageSize": 50, "firstResult": 0, "page": 1, "pagesNumber": 1 },
+  "response": "OK"
+}
+```
+
+`/api/library/books/1` returns one book. For filters, sorting and paging, the same endpoint accepts a query message: see [List filters and queries](/guides/list-filters). The Vue frontend and the [TypeScript SDK](/frontend-sdk) use this API and the page metadata to render the screens, so a new entity needs no new frontend code.
+
+## Choose your frontend
+
+| You want | Use |
+|---|---|
+| A modern, decoupled app | **Vue 3** with [`@dynamia-tools/vue`](/vue-support) on top of the REST API and the TypeScript SDK. This is what the CLI generates |
+| A complete UI with no JavaScript | **ZK**: screens are rendered on the server from the same descriptors |
+| The best of both | **Microfrontends**: drop a Vue, React or Svelte bundle into any ZK page. See [Embedding microfrontends](/guides/microfrontends) |
+
+## Build with Claude Code
+
+Working with [Claude Code](https://claude.com/claude-code)? The **`dynamia-platform`** plugin teaches Claude the conventions of the platform, so the code it writes follows them: entities and `CrudService`, modules and `CrudPage`, actions, YAML descriptors, ZK pages, the `@dynamia-tools` Vue packages and the extensions. It reads the official documentation at the version of your project, and it can install the `dynamia` CLI and create new projects for you.
+
+Install it from the [`dynamia-tools` marketplace](https://github.com/dynamiatools/claude-plugins). Inside Claude Code:
+
+```
+/plugin marketplace add dynamiatools/claude-plugins
+/plugin install dynamia-platform@dynamia-tools
+```
+
+Or from a terminal:
+
+```bash
+claude plugin marketplace add dynamiatools/claude-plugins
+claude plugin install dynamia-platform@dynamia-tools
+```
+
+Then open Claude Code in your project and describe what you need, or call a skill directly:
+
+| Skill | Use it for |
+|---|---|
+| `dynamia-platform:cli` | Install or update the CLI and create a project |
+| `dynamia-platform:backend` | Entities, `CrudService`, modules, actions, validators and view descriptors |
+| `dynamia-platform:vue-frontend` | `@dynamia-tools` packages, server actions and list queries |
+| `dynamia-platform:zk-ui` | ZUL pages, view models and microfrontends |
+| `dynamia-platform:extensions` | SaaS, reports, files, dashboard, email and SMS, finances |
+| `dynamia-platform:docs` | The official docs, read live at your project's version |
+
+## Add Dynamia to an existing project
+
+Already have a Spring Boot 4 application? Add the platform by hand.
+
+<Tabs>
+  <TabItem label="Maven">
+    <Code lang="xml" title="pom.xml" code={`<dependencies>
     <dependency>
         <groupId>tools.dynamia</groupId>
-        <artifactId>dynamia-tools-starter</artifactId>
-        <version>VERSION</version>
+        <artifactId>tools.dynamia.app</artifactId>
+        <version>${dynamiaToolsVersion}</version>
     </dependency>
-</dependencies>
-```
+    <dependency>
+        <groupId>tools.dynamia</groupId>
+        <artifactId>tools.dynamia.zk</artifactId>
+        <version>${dynamiaToolsVersion}</version>
+    </dependency>
+    <dependency>
+        <groupId>tools.dynamia</groupId>
+        <artifactId>tools.dynamia.domain.jpa</artifactId>
+        <version>${dynamiaToolsVersion}</version>
+    </dependency>
+</dependencies>`} />
+  </TabItem>
+  <TabItem label="Gradle">
+    <Code lang="groovy" title="build.gradle" code={`dependencies {
+    implementation 'tools.dynamia:tools.dynamia.app:${dynamiaToolsVersion}'
+    implementation 'tools.dynamia:tools.dynamia.zk:${dynamiaToolsVersion}'
+    implementation 'tools.dynamia:tools.dynamia.domain.jpa:${dynamiaToolsVersion}'
+}`} />
+  </TabItem>
+</Tabs>
 
-**Gradle**
-```groovy
-//build.gradle
-compile 'tools.dynamia:dynamia-tools-starter:VERSION'
-```
-
-Replace `VERSION` with the latest release (26.11.0 at the time of writing). Check [Maven Central](https://central.sonatype.com/artifact/tools.dynamia/tools.dynamia.app) or the [GitHub releases](https://github.com/dynamiatools/framework/releases) for the last version.
-
-This starter enable DynamiaTools in your application and add support for ZK, JPA and custom views and routes.
-
-4. Run and done
+Then enable the platform on your main class:
 
 ```java
-//MyApplication.java
-
-package demo;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
 @SpringBootApplication
-class MyApplication {
+@EnableDynamiaTools  // this is all you need
+public class MyApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(MyApplication.class, args);
     }
-
 }
 ```
 
-After running the application, open your browser and go to http://localhost:8080. You should see a blank page with a
-fully functional HTML template called Dynamical. Later will customize this page
+Run it with `mvn spring-boot:run` (or `gradle bootRun`) and open `http://localhost:8080`. You will see a blank page with a working HTML template called Dynamical, ready for the entity, descriptors and module from the steps above.
 
-![First time running DynamiaTools](../../assets/getting-started/first-run.png)
+![A new Dynamia Platform application running for the first time](../../assets/getting-started/first-run.png)
 
-### Two ways to enable DynamiaTools
+<Aside title="Annotation or auto-configuration">
+You can turn the platform on with `@EnableDynamiaTools`, which is explicit and lets you compose individual modules (see [Custom Setup](/custom-setup)), or with the `dynamia-tools-zk-starter` dependency, which is picked up by Spring Boot auto-configuration and needs no annotation. Both end in the same place.
+</Aside>
 
-DynamiaTools can be turned on in a Spring Boot app in two ways:
+All artifacts, core and extensions alike, share the same version, so you never have to match them. Extensions live under the `tools.dynamia.modules` group: see [Extensions](/extensions/).
 
-- **Classic — `@EnableDynamiaTools` annotation.** Add the annotation to your `@SpringBootApplication` class together with the `tools.dynamia.app` dependency. This is explicit and gives you fine-grained control when you compose individual modules yourself (see the [Custom Setup](/custom-setup) guide).
-- **Newer — `zk-starter` auto-configuration.** The `platform/starters/zk-starter` module (artifact `dynamia-tools-zk-starter`) ships `DynamiaToolsAutoConfiguration` and an `AutoInitViewDescriptors` runner that are picked up automatically by Spring Boot's auto-configuration mechanism. No annotation needed — just add the starter dependency (as in step 3 above) and DynamiaTools, ZK UI, and view descriptor loading are configured for you.
+### Settings and look
 
-Both paths end up in the same place, so pick whichever fits your project: the annotation for explicit, hand-composed setups, the starter for a zero-effort, annotation-free start. Either way, once your app is running you can pick a template/skin — see [Themes](/ecosystem/themes).
-
-
-
-## First project
-
-Let's create something useful, like a contact CRUD to store our contact list. To create a CRUD in Dynamia Tools, follow these 3 steps:
-
-
-1. Create a JPA entity
-2. Create a Dynamia module
-3. Define a view descriptor for **form** and **table** views
-
-### 1. Create a JPA entity
-
-Let's create a new class called `Contact` and annotated with `@Entity` to create a JPA entity. Add the fields name, email and
-phone.
-
-```java
-//Contact.java
-package demo;
-
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
-import jakarta.persistence.Id;
-import jakarta.validation.constraints.NotNull;
-
-import jakarta.persistence.*;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
-
-@Entity
-@Table(name="contacts")
-public class Contact {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
-
-    @NotEmpty
-    private String name;
-    @Email
-    private String email;
-
-    private String phone;
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    @Override
-    public String toString() {
-        return name;
-    }
-}
-```
-
-This is a simple POJO class annotated with standard JPA annotations. Note that you can also use Validations annotation
-
-
-## 2. DynamiaTools modules
-
-DynamiaTools modules are standard Spring component classes that implement the `tools.dynamia.navigation.ModuleProvider`
-interface and return a new `tools.dynamia.navigation.Module` object. Think of Dynamia modules as routers that define the navigation for pages.
-
-
-```java
-//ContactModuleProvider.java
-package demo;
-
-import org.springframework.stereotype.Component;
-import tools.dynamia.crud.CrudPage;
-import tools.dynamia.navigation.Module;
-import tools.dynamia.navigation.ModuleProvider;
-
-@Component
-public class ContactModuleProvider implements ModuleProvider {
-
-    @Override
-    public Module getModule() {
-
-        Module myModule = new Module("my-module", "My Module");
-        myModule.addPage(new CrudPage("contacts", "Contacts", Contact.class));
-
-        return myModule;
-    }
-}
-```
-`Modules` includes an ID, name, pages and pages groups. On the other hand the `Pages` include ID, name and path, which
-in this case is represented by an entity Class. `IDs` are crucial because they define the path for your pages. For instance,
-the `Contact` crud page has the path `/pages/my-module/contacts`.
-
-## 3. View descriptors
-
-View descriptors define how the views for entities will be renderer in runtime. By default, DynamiaTools render views for
-Forms, Tables, Trees, Configs and others. In advanced guides you will learn how to customize view renderers and implement
-your own Views types.
-
-Descriptors are `YMLs` files with fields and parameters for entity classes. Lets create a folder for then in `/resources/META-INF/descriptors` a
-nd create the file `ContactForm.yml`. The name of the file is not special but for good practice name it using the entity name and the view type.
+Use `application.yml` to customize the application. The `dynamia.app` group holds the global settings:
 
 ```yaml
-# /resources/META-INF/descriptors/ContactForm.yml
-view: form # required
-beanClass: demo.Contact # use fully qualified class name
-
-fields:
-  name:
-    params: # customize component and layout
-      span: 3
-  email:
-    params:
-      type: email # setup type attribute of ZK textbox component
-  phone:
-    component: textbox #optional because string field are renderer link Textbox
-
-
-#optional
-layout:
-  columns: 3
-
-```
-
-Now create a view descriptor for the table view `ContactTable.yml`
-
-```yaml
-# /resources/META-INF/descriptors/ContactTable.yml
-view: table
-beanClass: demo.Contact # use fully qualified class name
-
-#all field are rendered like Labels because view type is table
-fields:
-  name:
-  email:
-  phone:
-```
-
-### 4. Run and enjoy
-
-Now your app has a new menu called My Module and a submenu called Contacts. This is a fully functional CRUD with create,
-read, update, delete and many more ready to use actions.
-
-#### Table View
-![Contact crud table view](../../assets/getting-started/contact-crud-1.png)
-
-#### Form View
-![Contact crud table view](../../assets/getting-started/contact-crud-2.png)
-
-<Aside>Don’t be concerned about Spanglish labels in titles and actions, DynamiaTools and ZK have localized labels, and my browser is set to Spanish.</Aside>
-
-### Customize your first project
-
-Use standard Spring Boot `application.properties` or `application.yml` files to customize global settings for dynamia tools projects.
-Use `dynamia.app` properties groups for dynamia tools.
-
-```yaml
-#application.yml
+# application.yml
 dynamia:
   app:
     name: My First Project
     short-name: MFP
     default-skin: Green
     default-logo: /static/logo.png
-    default-icon: /static/icon.png # used when navigation bar is collapsed
+    default-icon: /static/icon.png   # used when the navigation bar is collapsed
     url: https://www.dynamia.tools
-
-#other spring boot settings
-
 ```
 
-Re-run your application and this time is beautiful app
+![The application with custom settings](../../assets/getting-started/customize.png)
 
-![Custom settings](../../assets/getting-started/customize.png)
+The default template, [Dynamical](/ecosystem/themes), is a responsive Bootstrap 5 template.
 
-**Responsive**
-
-![Responsive support](../../assets/getting-started/responsive.png)
-
-**Dynamical** is a Bootstrap 5 free template fully responsive, check https://github.com/dynamiatools/theme-dynamical for documentation
-
-
-### Automatic REST
-
-You’ve just built a full-stack project with DynamiaTools in about **10-15** minutes. Your project includes some special features,
-one of which is an automatic RESTful endpoint for all `CrudPages`. Create some contacts in the front end, then replace the browser
-URL with http://localhost:8080/api/my-module/contacts.
-
-You should see a JSON response with your contacts. In my case, I received the following response:
-
-```json
-//http://localhost.com:8080/api/my-module/contacts
-{
-  "data" : [ {
-    "id" : 1,
-    "name" : "Peter Parker",
-    "email" : "spidy@gmail.com",
-    "phone" : "5556565656"
-  }, {
-    "id" : 2,
-    "name" : "Dr Doom",
-    "email" : "doomed@gmail.com",
-    "phone" : "555-6999-666"
-  }, {
-    "id" : 3,
-    "name" : "Tony Iron Stark",
-    "email" : "ceo@starksindustry.com",
-    "phone" : "5551656565"
-  } ],
-  "pageable" : {
-    "totalSize" : 3,
-    "pageSize" : 50,
-    "firstResult" : 0,
-    "page" : 1,
-    "pagesNumber" : 1
-  },
-  "response" : "OK"
-}
-```
-
-Then navigate to http://localhost.com:8080/api/my-module/contacts/1 and get info of contact with ID = 1
-
-```json
-{
-    "data": {
-        "id": 1,
-        "name": "Peter Parker",
-        "email": "spidy@gmail.com",
-        "phone": "5556565656"
-    },
-    "response": "OK"
-}
-```
-
-Check that DynamiaTool default json form has this form:
-
-```json
-{
-  "data": [],
-  "response": "",
-  "pageable": {}
-}
-```
-
-
-## Congratulations
-
-With this **Getting Started** guide, you’ve just built a web application with automatic CRUD support, automatic RESTful endpoints,
-and a responsive template. Continue with the following guides to learn advanced topics with DynamiaTools.
+![Responsive layout on a phone](../../assets/getting-started/responsive.png)
 
 ## Next steps
 
-- [Key Concepts](/key-concepts) — the building blocks of an application.
-- [Entities](/guides/entities) and [Crud Service](/guides/crud-service) — model and persist your data.
-- [View Descriptors](/view-descriptors) — shape forms and tables with YAML.
-- [Frontend SDK](/frontend-sdk) and [Vue Support](/vue-support) — build a custom frontend on the generated REST API.
+<CardGrid>
+  <LinkCard title="Key concepts" description="Modules, pages, entities, views and actions." href="/key-concepts/" />
+  <LinkCard title="Entities and Crud Service" description="Model and persist your data." href="/guides/entities/" />
+  <LinkCard title="View descriptors" description="Shape forms and tables with YAML." href="/view-descriptors/" />
+  <LinkCard title="Frontend SDK and Vue" description="Build your own frontend on the generated API." href="/frontend-sdk/" />
+</CardGrid>
