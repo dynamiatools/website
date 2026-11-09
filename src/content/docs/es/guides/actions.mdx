@@ -291,7 +291,7 @@ propósito.
 | `UNDECLARED` | Nadie la declaró y no se puede derivar: no se publica |
 
 Un cliente remoto llama a una acción headless por su id: por defecto el nombre de la clase sin el sufijo
-`Action`, en minúsculas (`DeleteAction` pasa a ser `delete`).
+`Action` y con la primera letra en minúscula (`DeleteAction` pasa a ser `delete`, `ApproveOrderAction` pasa a ser `approveOrder`).
 
 <Aside type="caution" title="HeadlessCapable está obsoleta">
 Antes de la 26.11.0 una acción se habilitaba implementando `HeadlessCapable`. Esa interfaz está obsoleta:
