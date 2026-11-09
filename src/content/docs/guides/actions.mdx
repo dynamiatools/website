@@ -296,7 +296,7 @@ is published on purpose.
 | `UNDECLARED` | Nobody declared it and it cannot be derived: it is not published |
 
 A remote client calls a headless action by its id: by default the class name without the `Action`
-suffix, in lower case (`DeleteAction` becomes `delete`).
+suffix and the first letter in lower case (`DeleteAction` becomes `delete`, `ApproveOrderAction` becomes `approveOrder`).
 
 <Aside type="caution" title="HeadlessCapable is deprecated">
 Before 26.11.0 an action opted in by implementing `HeadlessCapable`. That interface is deprecated:
