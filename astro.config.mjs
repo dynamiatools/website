@@ -32,12 +32,50 @@ export default defineConfig({
                         sizes: '32x32',
                     },
                 },
+                {
+                    tag: 'meta',
+                    attrs: {property: 'og:image', content: 'https://dynamia.tools/og-image.png'},
+                },
+                {
+                    tag: 'meta',
+                    attrs: {property: 'og:image:alt', content: 'Dynamia Platform: full-stack Java 25 framework for enterprise web applications'},
+                },
+                {
+                    tag: 'meta',
+                    attrs: {name: 'twitter:image', content: 'https://dynamia.tools/og-image.png'},
+                },
+                {
+                    tag: 'script',
+                    attrs: {type: 'application/ld+json'},
+                    content: JSON.stringify({
+                        '@context': 'https://schema.org',
+                        '@graph': [
+                            {
+                                '@type': 'WebSite',
+                                '@id': 'https://dynamia.tools/#website',
+                                name: 'Dynamia Platform',
+                                alternateName: 'DynamiaTools',
+                                url: 'https://dynamia.tools/',
+                                inLanguage: ['en', 'es'],
+                            },
+                            {
+                                '@type': 'SoftwareSourceCode',
+                                name: 'Dynamia Platform',
+                                codeRepository: 'https://github.com/dynamiatools/framework',
+                                programmingLanguage: 'Java',
+                                version: dynamiaToolsVersion,
+                                license: 'https://www.apache.org/licenses/LICENSE-2.0',
+                                url: 'https://dynamia.tools/',
+                            },
+                        ],
+                    }),
+                },
             ],
             customCss: [
                 './src/styles/custom.css'
             ],
             editLink: {
-                baseUrl: 'https://github.com/dynamiatools/website',
+                baseUrl: 'https://github.com/dynamiatools/website/edit/main/',
             },
             social: [
                 {icon: 'github', label: 'GitHub', href: 'https://github.com/dynamiatools/framework'}
