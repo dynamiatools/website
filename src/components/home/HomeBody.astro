@@ -2,7 +2,6 @@
 // Body of the home page, below the hero. One component for both languages.
 import { copy, type Lang } from './copy';
 import { highlight } from './highlight';
-import { dynamiaToolsVersion } from '../../../astro.config.mjs';
 
 interface Props {
 	lang: Lang;
@@ -31,26 +30,19 @@ createApp(App).use(DynamiaVue).mount('#app');
 // In a component:
 // <DynamiaCrudPage :node="node" :client="client" />`;
 
-const pomCode = `<dependency>
-    <groupId>tools.dynamia</groupId>
-    <artifactId>dynamia-tools-starter</artifactId>
-    <version>${dynamiaToolsVersion}</version>
-</dependency>`;
+const installCode = `curl -fsSL https://get.dynamia.tools | bash`;
 
-const appCode = `@SpringBootApplication
-@EnableDynamiaTools
-public class App {
+const newCode = `dynamia new`;
 
-    public static void main(String[] args) {
-        SpringApplication.run(App.class, args);
-    }
-}`;
+const runCode = `cd my-erp/backend && ./mvnw spring-boot:run
+cd my-erp/frontend && pnpm dev`;
 
 const codes = {
 	sdk: highlight(sdkCode, 'ts'),
 	vue: highlight(vueCode, 'ts'),
-	pom: highlight(pomCode, 'xml'),
-	app: highlight(appCode, 'java'),
+	install: highlight(installCode, 'sh'),
+	create: highlight(newCode, 'sh'),
+	run: highlight(runCode, 'sh'),
 };
 ---
 
@@ -189,20 +181,27 @@ const codes = {
 		<ol class="dh-steps">
 			<li class="dh-step">
 				<p>{t.start.steps[0][0]}</p>
+				<div class="dh-win dh-src">
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.install.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+				</div>
 			</li>
 			<li class="dh-step">
 				<p>{t.start.steps[1][0]}</p>
 				<div class="dh-win dh-src">
-					<div class="dh-bar"><span>pom.xml</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
-					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.pom.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.create.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
 				</div>
 			</li>
 			<li class="dh-step">
 				<p>{t.start.steps[2][0]}</p>
 				<div class="dh-win dh-src">
-					<div class="dh-bar"><span>App.java</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
-					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.app.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.run.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
 				</div>
+			</li>
+			<li class="dh-step-note">
+				<a class="dh-textlink" href={t.start.claude[1]}>{t.start.claude[0]}</a>
 			</li>
 		</ol>
 	</section>
@@ -213,18 +212,36 @@ const codes = {
 	document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
 		button.addEventListener('click', async () => {
 			const code = button.closest('.dh-win')?.querySelector('code');
-			if (!code) return;
-			const text = [...code.querySelectorAll('.ln')].map((l) => (l.textContent ?? '').replace(/​/g, '')).join('\n');
+			const text =
+				button.dataset.copyText ??
+				[...(code?.querySelectorAll('.ln') ?? [])].map((l) => (l.textContent ?? '').replace(/\u200b/g, '')).join('\n');
+			if (!text) return;
+			let copied = false;
 			try {
 				await navigator.clipboard.writeText(text);
+				copied = true;
+			} catch {
+				// Fallback for browsers or contexts that refuse the async clipboard API
+				const area = document.createElement('textarea');
+				area.value = text;
+				area.setAttribute('readonly', '');
+				area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+				document.body.appendChild(area);
+				area.select();
+				try {
+					copied = document.execCommand('copy');
+				} catch {
+					copied = false;
+				}
+				area.remove();
+			}
+			if (copied) {
 				button.dataset.done = 'true';
 				button.textContent = button.dataset.doneLabel ?? '';
 				window.setTimeout(() => {
 					button.dataset.done = 'false';
 					button.textContent = button.dataset.label ?? '';
 				}, 1800);
-			} catch {
-				/* clipboard blocked: the user can still select the text */
 			}
 		});
 	});

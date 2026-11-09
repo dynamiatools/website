@@ -107,6 +107,10 @@ const rows = [
 						</a>
 					))}
 				</div>
+				<div class="dh-install">
+					<code><span class="dh-prompt" aria-hidden="true">$</span> curl -fsSL https://get.dynamia.tools | bash</code>
+					<button type="button" class="dh-copy" data-copy data-copy-text="curl -fsSL https://get.dynamia.tools | bash" data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button>
+				</div>
 			</div>
 
 			<section class="dh-stage" data-tab="entity" aria-label={t.stage.label}>

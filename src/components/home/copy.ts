@@ -95,10 +95,11 @@ export const copy = {
 		start: {
 			title: 'Start in five minutes',
 			steps: [
-				['Create a Spring Boot 4 project on Java 25.'],
-				['Add the starter dependency.'],
-				['Enable the platform and run it.'],
+				['Install the CLI.'],
+				['Create the project. Pick Java, Kotlin or Groovy, and Vue 3.'],
+				['Run the backend and the frontend.'],
 			],
+			claude: ['Working with Claude Code? Add the dynamia-platform plugin.', '/getting-started/#build-with-claude-code'],
 			copy: 'Copy',
 			copied: 'Copied',
 			primary: ['Open the getting started guide', '/getting-started/'],
@@ -196,10 +197,11 @@ export const copy = {
 		start: {
 			title: 'Empieza en cinco minutos',
 			steps: [
-				['Crea un proyecto Spring Boot 4 en Java 25.'],
-				['Agrega la dependencia del starter.'],
-				['Habilita la plataforma y ejecútala.'],
+				['Instala el CLI.'],
+				['Crea el proyecto. Elige Java, Kotlin o Groovy, y Vue 3.'],
+				['Ejecuta el backend y el frontend.'],
 			],
+			claude: ['¿Trabajas con Claude Code? Agrega el plugin dynamia-platform.', '/es/getting-started/#construye-con-claude-code'],
 			copy: 'Copiar',
 			copied: 'Copiado',
 			primary: ['Abre la guía de inicio', '/es/getting-started/'],

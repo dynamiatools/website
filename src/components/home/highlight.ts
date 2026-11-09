@@ -9,6 +9,7 @@ const keywords: Record<string, string[]> = {
 	ts: ['import', 'from', 'const', 'await', 'async', 'export', 'new', 'return', 'type'],
 	yaml: [],
 	xml: [],
+	sh: [],
 };
 
 type Lang = keyof typeof keywords;
@@ -17,7 +18,9 @@ export function highlight(source: string, lang: Lang): string[] {
 	const kw = keywords[lang];
 	const parts: string[] = [];
 	// comment | string | annotation (java) | key of yaml | word
-	if (lang === 'yaml') {
+	if (lang === 'sh') {
+		parts.push('(#.*$)');
+	} else if (lang === 'yaml') {
 		parts.push('(#.*$)');
 		parts.push('(^\\s*[A-Za-z_.]+(?=:))');
 		parts.push('("[^"]*"|\'[^\']*\')');
@@ -37,7 +40,8 @@ export function highlight(source: string, lang: Lang): string[] {
 		return safe.replace(re, (match, ...groups) => {
 			const idx = groups.findIndex((g) => g !== undefined && typeof g === 'string');
 			let cls = 'k';
-			if (lang === 'yaml') cls = idx === 0 ? 'c' : idx === 1 ? 'k' : 'a';
+			if (lang === 'sh') cls = 'c';
+			else if (lang === 'yaml') cls = idx === 0 ? 'c' : idx === 1 ? 'k' : 'a';
 			else if (lang === 'xml') cls = idx === 0 ? 'c' : 'k';
 			else cls = idx === 0 ? 'c' : idx === 1 || idx === 2 ? 'a' : 'k';
 			return `<span class="${cls}">${match}</span>`;
