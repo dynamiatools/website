@@ -15,6 +15,9 @@ export default defineConfig({
     site: 'https://dynamia.tools',
     integrations: [
         starlight({
+            components: {
+                Hero: './src/components/Hero.astro',
+            },
             plugins: [starlightLinksValidator({exclude: ['http://localhost:8080', 'http://localhost:8080/**']})],
             title: 'DynamiaTools',
             logo: {

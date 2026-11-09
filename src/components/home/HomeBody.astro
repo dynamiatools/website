@@ -1,0 +1,248 @@
+---
+// Body of the home page, below the hero. One component for both languages.
+import { copy, type Lang } from './copy';
+import { highlight } from './highlight';
+
+interface Props {
+	lang: Lang;
+}
+const { lang } = Astro.props;
+const t = copy[lang];
+
+const stack = ['Java 25', 'Kotlin', 'Groovy', 'Spring Boot 4', 'Vue 3', 'TypeScript', 'REST', 'YAML descriptors', 'JPA', 'ZK 10', 'Maven', 'Gradle'];
+
+const sdkCode = `import { DynamiaClient } from '@dynamia-tools/sdk';
+
+const client = new DynamiaClient({ baseUrl: 'https://app.example.com' });
+
+const result = await client.crud('store/books').find({
+  filters: [{ field: 'status', op: 'in', value: ['AVAILABLE', 'RESERVED'] }],
+  sort: [{ field: 'title' }],
+  size: 20,
+});
+// result.content, result.total, result.totalPages`;
+
+const vueCode = `import { createApp } from 'vue';
+import { DynamiaVue } from '@dynamia-tools/vue';
+
+createApp(App).use(DynamiaVue).mount('#app');
+
+// In a component:
+// <DynamiaCrudPage :node="node" :client="client" />`;
+
+const installCode = `curl -fsSL https://get.dynamia.tools | bash`;
+
+const newCode = `dynamia new`;
+
+const runCode = `cd my-erp/backend && ./mvnw spring-boot:run
+cd my-erp/frontend && pnpm dev`;
+
+const codes = {
+	sdk: highlight(sdkCode, 'ts'),
+	vue: highlight(vueCode, 'ts'),
+	install: highlight(installCode, 'sh'),
+	create: highlight(newCode, 'sh'),
+	run: highlight(runCode, 'sh'),
+};
+---
+
+<div class="dh dh-body">
+	<div class="dh-marquee" aria-hidden="true">
+		<div class="dh-marquee-track">
+			<div class="dh-marquee-group">{stack.map((s) => <span>{s}</span>)}</div>
+			<div class="dh-marquee-group">{stack.map((s) => <span>{s}</span>)}</div>
+		</div>
+	</div>
+
+	<section class="dh-sec" aria-labelledby="dh-layers-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-layers-title">{t.layers.title}</h2>
+			<p class="dh-sec-lead">{t.layers.lead}</p>
+			<a class="dh-textlink" href={lang === 'es' ? '/es/key-concepts/' : '/key-concepts/'}>{t.layers.more}</a>
+		</div>
+		<ol class="dh-layers">
+			<span class="dh-layers-line" aria-hidden="true"></span>
+			{
+				t.layers.items.map(([name, text, chip]) => (
+					<li class="dh-layer">
+						<h3>{name}</h3>
+						<p>{text}</p>
+						<code class="dh-chip">{chip}</code>
+					</li>
+				))
+			}
+		</ol>
+	</section>
+
+	<section class="dh-sec" aria-labelledby="dh-principles-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-principles-title">{t.principles.title}</h2>
+			<p class="dh-sec-lead">{t.principles.lead}</p>
+		</div>
+		<ul class="dh-points">
+			{
+				t.principles.items.map(([name, text], i) => (
+					<li class="dh-point">
+						<h3>{name}</h3>
+						<p>{text}</p>
+						{i === 2 && (
+							<div class="dh-langs">
+								{t.principles.langs.map((l) => (
+									<code class="dh-chip">{l}</code>
+								))}
+							</div>
+						)}
+					</li>
+				))
+			}
+		</ul>
+	</section>
+
+	<section class="dh-sec" aria-labelledby="dh-front-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-front-title">{t.frontend.title}</h2>
+			<p class="dh-sec-lead">{t.frontend.lead}</p>
+			<div class="dh-textlinks">
+				{t.frontend.links.map(([label, href]) => <a class="dh-textlink" href={href}>{label}</a>)}
+			</div>
+		</div>
+		<div class="dh-codes">
+			<div class="dh-win dh-src">
+				<div class="dh-bar"><span>{t.frontend.sdkFile}</span></div>
+				<div class="dh-panels">
+					<div class="dh-panel" tabindex="0"><pre><code>{codes.sdk.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div>
+				</div>
+			</div>
+			<div class="dh-win dh-src">
+				<div class="dh-bar"><span>{t.frontend.vueFile}</span></div>
+				<div class="dh-panels">
+					<div class="dh-panel" tabindex="0"><pre><code>{codes.vue.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div>
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<section class="dh-sec" aria-labelledby="dh-ext-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-ext-title">{t.extensions.title}</h2>
+			<p class="dh-sec-lead">{t.extensions.lead}</p>
+		</div>
+		<ul class="dh-ext-list">
+			{
+				t.extensions.items.map(([name, text, href]) => (
+					<li>
+						<a class="dh-ext" href={href}>
+							<strong>{name}</strong>
+							<span>{text}</span>
+						</a>
+					</li>
+				))
+			}
+		</ul>
+	</section>
+
+	<section class="dh-sec" aria-labelledby="dh-rel-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-rel-title">{t.release.title}</h2>
+			<a class="dh-textlink" href={lang === 'es' ? '/es/reference/release-notes/' : '/reference/release-notes/'}>{t.release.all}</a>
+		</div>
+		<ul class="dh-release">
+			{
+				t.release.items.map(([name, text, href]) => (
+					<li>
+						<a class="dh-rel" href={href}>
+							<strong>{name}</strong>
+							<span>{text}</span>
+						</a>
+					</li>
+				))
+			}
+		</ul>
+	</section>
+
+	<section class="dh-proof" aria-label={t.proof.note}>
+		<ul class="dh-proof-lines">
+			{t.proof.text.map((line) => <li>{line}</li>)}
+		</ul>
+		<p class="dh-proof-note">
+			<span>{t.proof.note}</span>
+			<a class="dh-textlink" href={t.proof.linkHref}>{t.proof.link}</a>
+		</p>
+	</section>
+
+	<section class="dh-sec dh-bottom" aria-labelledby="dh-start-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-start-title">{t.start.title}</h2>
+			<div class="dh-cta">
+				<a class="dh-btn dh-btn-primary" href={t.start.primary[1]}>{t.start.primary[0]}</a>
+				<a class="dh-btn dh-btn-secondary" href={t.start.secondary[1]}>{t.start.secondary[0]}</a>
+			</div>
+		</div>
+		<ol class="dh-steps">
+			<li class="dh-step">
+				<p>{t.start.steps[0][0]}</p>
+				<div class="dh-win dh-src">
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.install.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+				</div>
+			</li>
+			<li class="dh-step">
+				<p>{t.start.steps[1][0]}</p>
+				<div class="dh-win dh-src">
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.create.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+				</div>
+			</li>
+			<li class="dh-step">
+				<p>{t.start.steps[2][0]}</p>
+				<div class="dh-win dh-src">
+					<div class="dh-bar"><span>terminal</span><button type="button" class="dh-copy" data-copy data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button></div>
+					<div class="dh-panels"><div class="dh-panel" tabindex="0"><pre><code>{codes.run.map((html) => <span class="ln" set:html={html || '&#8203;'} />)}</code></pre></div></div>
+				</div>
+			</li>
+			<li class="dh-step-note">
+				<a class="dh-textlink" href={t.start.claude[1]}>{t.start.claude[0]}</a>
+			</li>
+		</ol>
+	</section>
+</div>
+
+<script>
+	// Copy buttons of the quick start: copy the code of their own window.
+	document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
+		button.addEventListener('click', async () => {
+			const code = button.closest('.dh-win')?.querySelector('code');
+			const text =
+				button.dataset.copyText ??
+				[...(code?.querySelectorAll('.ln') ?? [])].map((l) => (l.textContent ?? '').replace(/\u200b/g, '')).join('\n');
+			if (!text) return;
+			let copied = false;
+			try {
+				await navigator.clipboard.writeText(text);
+				copied = true;
+			} catch {
+				// Fallback for browsers or contexts that refuse the async clipboard API
+				const area = document.createElement('textarea');
+				area.value = text;
+				area.setAttribute('readonly', '');
+				area.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+				document.body.appendChild(area);
+				area.select();
+				try {
+					copied = document.execCommand('copy');
+				} catch {
+					copied = false;
+				}
+				area.remove();
+			}
+			if (copied) {
+				button.dataset.done = 'true';
+				button.textContent = button.dataset.doneLabel ?? '';
+				window.setTimeout(() => {
+					button.dataset.done = 'false';
+					button.textContent = button.dataset.label ?? '';
+				}, 1800);
+			}
+		});
+	});
+</script>
