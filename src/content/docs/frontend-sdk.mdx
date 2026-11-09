@@ -139,10 +139,47 @@ interface CrudListResult<T = unknown> {
 | Method | Endpoint | SDK call |
 |---|---|---|
 | `GET` | `/api/{path}` | `crud(path).findAll(params?)` |
+| `POST` | `/api/{path}/find` | `crud(path).find(spec?)` |
 | `GET` | `/api/{path}/{id}` | `crud(path).findById(id)` |
 | `POST` | `/api/{path}` | `crud(path).create(entity)` |
 | `PUT` | `/api/{path}/{id}` | `crud(path).update(id, entity)` |
 | `DELETE` | `/api/{path}/{id}` | `crud(path).delete(id)` |
+
+### Filter, search and sort with `find()`
+
+`findAll()` only reads `page`, `size`, the text search `q` and the order. To filter by field, use `find()`: it sends a `QuerySpec` to `POST /api/{path}/find` and resolves to the same `CrudListResult<T>`.
+
+```typescript
+const result = await client.crud('library/books').find({
+  filters: [
+    { field: 'publishDate', op: 'between', value: ['2026-01-01', '2026-01-31'] },
+    { field: 'status', op: 'in', value: ['AVAILABLE', 'RESERVED'] },
+  ],
+  search: 'clean',                 // text search over the visible text fields
+  sort: [{ field: 'title', dir: 'asc' }],
+  page: 1,                         // 1-based
+  size: 20,
+});
+```
+
+A `QuerySpec` has these parts (all optional):
+
+| Field | Meaning |
+|---|---|
+| `filters` | List of `{ field, op, value }`, at most one per field |
+| `search` | Text to look for in the visible text fields |
+| `sort` | List of `{ field, dir }`; `dir` is `asc` (default) or `desc` |
+| `page` / `size` | 1-based page and page size |
+
+Operators: `eq`, `like`, `between` (`[from, to]`, a `null` side is open), `gte`, `lte`, `in` (a list) and `isNull` (a boolean). A date without time covers the whole day of a field that has time.
+
+The server checks every field against the page's view descriptor. A field the descriptor does not have, a value of the wrong type or a query over the limits is rejected with a `422` (`DynamiaApiError`), never silently ignored. The limits are 20 filters, 100 values in an `in`, 5 sort keys, 200 characters of search and a page size of 500 (50 by default).
+
+<Aside type="note" title="Version">
+`POST /api/{path}/find` and `crud(path).find()` are available in Dynamia Platform **26.11.0**.
+</Aside>
+
+To restrict what a client may query on the server, register a `QuerySpecFilter` bean. See [Server-side query filters](/guides/list-filters#server-side-query-filters).
 
 ### CRUD by class name
 
