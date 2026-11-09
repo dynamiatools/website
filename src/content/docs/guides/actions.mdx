@@ -271,6 +271,61 @@ actions:
     enabled: true
 ```
 
+## Publishing actions to remote clients: `@RunsOn`
+
+A remote client, such as the Vue frontend, only sees the actions the server publishes in the action
+metadata. You decide it **for each concrete class** with `@RunsOn`:
+
+```java
+@InstallAction
+@RunsOn(ActionRuntime.HEADLESS)
+public class ApproveOrderAction extends AbstractCrudAction {
+    // uses UIMessages, UIChoices, UIFiles ... and no ZK classes
+}
+```
+
+The annotation is read from the concrete class only. A subclass does not inherit it, so each action
+is published on purpose.
+
+| `ActionRuntime` | Meaning |
+|---|---|
+| `HEADLESS` | A local action written against the [UI ports](/guides/ui-ports). The server runs it and a remote client drives it, answering its questions step by step |
+| `FLOW` | A `FlowRemoteAction`: an explicit state machine on the server |
+| `REMOTE` | A plain `RemoteAction`: one request, one answer |
+| `FRONTEND` | Behaviour of each front end (search box, filters panel, ZK screens). It is in the catalog but has no endpoint and the server never runs it |
+| `UNDECLARED` | Nobody declared it and it cannot be derived: it is not published |
+
+A remote client calls a headless action by its id: by default the class name without the `Action`
+suffix, in lower case (`DeleteAction` becomes `delete`).
+
+<Aside type="caution" title="HeadlessCapable is deprecated">
+Before 26.11.0 an action opted in by implementing `HeadlessCapable`. That interface is deprecated:
+declare `@RunsOn(ActionRuntime.HEADLESS)` on the concrete class instead. Its `headlessSupported()`
+method still works as a dynamic veto while the interface exists.
+</Aside>
+
+An action that runs headless is executed again from the start every time the user answers a question,
+and only the last run is committed. Keep the code that runs before an interaction free of side
+effects other than database writes.
+
+## Row menu and ordering
+
+CRUD actions can ask to be listed in the row menu (the "more" menu of each record) with
+`setMenuSupported(true)`, and can be ordered with `setPosition(...)`; lower positions come first
+and the default is `0`. Both are published in the action metadata as `menuSupported` and `position`.
+
+```java
+public CopyIsbnAction() {
+    setName("Copy ISBN");
+    setApplicableClass(Book.class);
+    setMenuSupported(true); // acts on one record: listed in the row menu
+    setPosition(10);        // after the actions with a lower position
+}
+```
+
+The Vue CRUD shows the main action of a row as a button and lists only the actions with
+`menuSupported` in the row menu, sorted by `position`.
+
 ## Recommendations
 
 <CardGrid>
@@ -294,6 +349,8 @@ actions:
 
 ## Related
 
+- [UI Ports for Actions](/guides/ui-ports) — messages, questions, pickers, previews and navigation that work in ZK and in remote clients.
+- [List Filters and Queries](/guides/list-filters) — portable toolbar filters with `FilterAction`.
 - [View Descriptors](/view-descriptors) — control action availability per view with the `actions` section.
 - [Crud Service](/guides/crud-service) — the persistence API most actions delegate to.
 - [Crud Listeners](/guides/crud-listeners) — for logic that must run on every create/update/delete regardless of which action triggered it.
