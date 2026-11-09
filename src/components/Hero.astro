@@ -87,7 +87,7 @@ const rows = [
 		<div class="dh dh-hero">
 			<div class="dh-hero-bg" aria-hidden="true" />
 			<div class="dh-mark" aria-hidden="true">
-				<Image src={mark} alt="" width={460} loading="eager" fetchpriority="high" />
+				<Image src={mark} alt="" width={460} loading="lazy" decoding="async" />
 			</div>
 
 			<h1 class="dh-title">
@@ -288,7 +288,7 @@ const rows = [
 		// Start cycling only after the entrance sequence has played.
 		if (!paused) {
 			stop();
-			window.setTimeout(start, 4500);
+			window.setTimeout(start, 3200);
 		}
 	}
 </script>

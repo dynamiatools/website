@@ -1,0 +1,12 @@
+---
+// Extends Starlight's <head>. On the home pages only, it preloads the Geist text font so it arrives before the
+// first paint and the headline does not reflow (and push the page down) when the web font replaces the fallback.
+import Default from '@astrojs/starlight/components/Head.astro';
+import geistLatin from '@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url';
+
+const path = Astro.url.pathname.replace(/\/$/, '');
+const isHome = path === '' || path === '/es';
+---
+
+<Default {...Astro.props}><slot /></Default>
+{isHome && <link rel="preload" as="font" type="font/woff2" href={geistLatin} crossorigin="anonymous" />}

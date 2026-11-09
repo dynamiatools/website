@@ -17,6 +17,7 @@ export default defineConfig({
         starlight({
             components: {
                 Hero: './src/components/Hero.astro',
+                Head: './src/components/Head.astro',
             },
             plugins: [starlightLinksValidator({exclude: ['http://localhost:8080', 'http://localhost:8080/**']})],
             title: 'DynamiaTools',
