@@ -154,7 +154,7 @@ Key Dynamia Platform concepts to explain clearly:
 ## Styling
 
 ### Custom Theme
-- Primary accent color: `hsl(150, 76%, 34%)` (green)
+- Primary accent color: `hsl(150, 76%, 34%)` (green) in dark mode; light mode uses `accent` `hsl(150, 76%, 30%)` and `accent-high` `hsl(150, 76%, 24%)` so text and buttons pass WCAG AA (see `src/styles/custom.css`)
 - Custom styles in `src/styles/custom.css`
 - Use CSS variables from Starlight theme
 - Support both light and dark modes

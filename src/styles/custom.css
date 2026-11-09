@@ -1,18 +1,49 @@
+/*
+ * Brand accent: green, hue 150.
+ * Starlight uses three accent tokens: -low (tinted backgrounds), the accent itself (buttons, active items)
+ * and -high (text and links in the light theme). Contrast was checked against WCAG AA (4.5:1):
+ *   dark  theme: accent hsl(150 76% 34%) on the dark background = 4.8:1; black text on the accent = 5.7:1
+ *   light theme: accent-high hsl(150 76% 24%) on white = 6.5:1; white text on accent hsl(150 76% 30%) = 4.6:1
+ */
 :root {
+    --sl-color-accent-low: hsl(150, 50%, 14%);
     --sl-color-accent: hsl(150, 76%, 34%);
-    --sl-color-accent-high: hsl(150, 76%, 40%);
-
+    --sl-color-accent-high: hsl(150, 70%, 65%);
 }
 
-[data-theme="light"]:root{
-    --sl-color-accent-high: hsl(150, 76%, 40%);
-    --sl-color-accent: hsl(150, 76%, 34%);
+:root[data-theme="light"] {
+    --sl-color-accent-low: hsl(150, 60%, 92%);
+    --sl-color-accent: hsl(150, 76%, 30%);
+    --sl-color-accent-high: hsl(150, 76%, 24%);
 }
-
 
 [data-has-hero] header {
     border-bottom: 1px solid transparent;
     background-color: transparent;
     -webkit-backdrop-filter: blur(16px);
     backdrop-filter: blur(16px);
+}
+
+/* Home: keep the tagline readable on wide screens */
+[data-has-hero] .hero .tagline {
+    max-width: 38rem;
+}
+
+/* Cards on the home page lift slightly on hover, unless the user prefers reduced motion */
+@media (prefers-reduced-motion: no-preference) {
+    .sl-link-card {
+        transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .sl-link-card:hover {
+        transform: translateY(-2px);
+    }
+}
+
+/* Make the keyboard focus visible on cards and links with the brand color */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+    outline: 2px solid var(--sl-color-accent-high);
+    outline-offset: 2px;
 }
