@@ -1,25 +1,38 @@
 ---
-title: Soporte Vue (Beta)
-description: Construye aplicaciones Vue 3 guiadas por metadata con @dynamia-tools/vue y el SDK core
+title: Soporte Vue
+description: Construye aplicaciones Vue 3 basadas en metadatos con @dynamia-tools/vue — composables, componentes globales y el patrón DynamiaCrudPage
 ---
 
-`@dynamia-tools/vue` es el adaptador oficial de **Vue 3** para Dynamia Platform y actualmente esta en **beta**.
+import {Card, CardGrid, Aside, LinkButton} from '@astrojs/starlight/components';
+
+`@dynamia-tools/vue` es el **adaptador oficial de Vue 3** para Dynamia Platform. Envuelve cada clase de vista de `@dynamia-tools/ui-core` (ver [SDK Frontend](/es/frontend-sdk)) con reactividad de Vue (`ref`/`computed`), expone ese comportamiento mediante composables y trae un conjunto de componentes globales delgados, hasta llegar a cada campo de entrada.
+
+La pieza central es `<DynamiaViewer>`, que resuelve cualquier tipo de vista automáticamente, igual que el componente `Viewer` de ZK en el backend. Para aplicaciones completas guiadas por el árbol de navegación, `<DynamiaCrudPage>` dibuja de punta a punta los nodos `NavigationNode` de tipo `CrudPage`, sin conexiones manuales del CRUD.
 
 Se apoya en:
 
-- `@dynamia-tools/sdk` (API y metadata)
-- `@dynamia-tools/ui-core` (modelo de vistas y contratos de render)
+- `@dynamia-tools/sdk` (API y metadatos)
+- `@dynamia-tools/ui-core` (modelo de vistas y contratos de renderizado)
 - Vue 3 (`>= 3.4`)
 
-## Instalacion
+<Aside type="note">
+  `@dynamia-tools/vue` se publica bajo el mismo CalVer unificado que el resto de Dynamia Platform y su
+  superficie de composables y componentes está documentada abajo. Como en cualquier paquete en desarrollo
+  activo, fija las versiones de tus dependencias frontend y revisa el `README.md` del paquete al actualizar
+  entre versiones menores.
+</Aside>
+
+## Instalación
 
 ```bash
 pnpm add vue @dynamia-tools/sdk @dynamia-tools/ui-core @dynamia-tools/vue
 ```
 
-## Configuracion de la app
+`vue >= 3.4`, `@dynamia-tools/ui-core` y `@dynamia-tools/sdk` son dependencias peer.
 
-Registra `DynamiaVue` una vez en el entry point.
+## Configuración del plugin
+
+Registra `DynamiaVue` una sola vez en el punto de entrada de tu aplicación. Registra todos los renderizadores de vistas, las fábricas de vistas y los componentes globales listados abajo.
 
 ```typescript
 // main.ts
@@ -39,14 +52,33 @@ app.mount('#app');
 import { DynamiaClient } from '@dynamia-tools/sdk';
 
 export const client = new DynamiaClient({
+  // baseUrl es el origen de la app: las llamadas del SDK ya incluyen /api/...
   baseUrl: import.meta.env.VITE_DYNAMIA_API_URL ?? 'http://localhost:8484',
   token: import.meta.env.VITE_DYNAMIA_TOKEN,
 });
 ```
 
-## Ejemplo rapido con Viewer
+## Componentes globales
 
-`<DynamiaViewer>` es el componente universal que resuelve tipos de vista automaticamente.
+Después de `app.use(DynamiaVue)`, los siguientes componentes están disponibles en todas partes, sin importarlos archivo por archivo:
+
+| Componente | Descripción |
+|---|---|
+| `<DynamiaViewer>` | Anfitrión universal de vistas: resuelve cualquier tipo de vista |
+| `<DynamiaForm>` | Renderizado de formularios |
+| `<DynamiaTable>` | Renderizado de tablas |
+| `<DynamiaCrud>` | CRUD completo (formulario + tabla + acciones) |
+| `<DynamiaField>` | Despachador de un solo campo |
+| `<DynamiaActions>` | Barra de acciones |
+| `<DynamiaNavMenu>` | Menú o barra lateral de navegación |
+| `<DynamiaNavBreadcrumb>` | Migas de pan de navegación |
+| `<DynamiaCrudPage>` | Página CRUD completamente conectada para `NavigationNode.type === 'CrudPage'` |
+
+Los componentes de campo individuales (`Textbox`, `Textareabox`, `Intbox`, `Spinner`, `Combobox`, `Datebox`, `Checkbox`, `EntityPicker`, `EntityRefPicker`, `EntityRefLabel`, `CoolLabel`, `Link`) viven en `fields/` y los despacha automáticamente `<DynamiaField>` según `field.resolvedComponent`; rara vez los referencias directamente.
+
+## Ejemplo rápido con Viewer
+
+`<DynamiaViewer>` se encarga automáticamente de resolver el descriptor, inicializar la vista, mostrar el estado de carga y los errores.
 
 ```vue
 <script setup lang="ts">
@@ -67,13 +99,182 @@ const { loading, error } = useViewer({
 </template>
 ```
 
-## Patron navegacion + CrudPage
+`<DynamiaViewer>` también acepta `descriptor-id` (obtiene un descriptor con nombre) o un `:descriptor` ya cargado (evita por completo la llamada de red), además de los slots `#loading`, `#error` y `#unsupported`.
 
-Para backoffice, un patron comun es:
+## Composables
 
-- `useNavigation(client, { autoSelectFirst: true })`
-- `<DynamiaNavMenu>` + `<DynamiaNavBreadcrumb>`
-- `<DynamiaCrudPage>` para nodos con `type === 'CrudPage'`
+Todos los composables son envoltorios reactivos delgados sobre la subclase `View` correspondiente de `ui-core`.
+
+### useViewer
+
+El composable principal: crea un `VueViewer`, lo inicializa al montar y lo destruye al desmontar.
+
+```typescript
+import { useViewer } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { viewer, view, loading, error, getValue, setValue, setReadonly } = useViewer({
+  viewType: 'form',
+  beanClass: 'com.example.Book',
+  client,
+  value: { title: 'Clean Code' }, // valor inicial opcional
+  readOnly: false,
+});
+```
+
+### useView
+
+Composable genérico de ciclo de vida para cualquier subclase de `VueView`; los composables más específicos de abajo lo usan internamente.
+
+```typescript
+import { useView, VueFormView } from '@dynamia-tools/vue';
+
+const { view, loading, error, initialized } = useView(
+  () => new VueFormView(descriptor, metadata),
+);
+```
+
+### useForm
+
+Acceso directo a un `VueFormView`:
+
+```typescript
+import { useForm } from '@dynamia-tools/vue';
+
+const { view, values, errors, loading, fields, layout, validate, submit, reset, setFieldValue } =
+  useForm({
+    descriptor,                    // obligatorio: ViewDescriptor
+    entityMetadata,                // opcional: EntityMetadata
+    initialData: { title: '...' }, // datos iniciales opcionales del formulario
+  });
+
+values.value.title = 'New Title';
+validate();     // boolean
+await submit(); // emite 'submit' en la vista
+```
+
+### useTable
+
+Acceso directo a un `VueTableView`:
+
+```typescript
+import { useTable } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { view, rows, columns, pagination, loading, sort, search, load, nextPage, prevPage } =
+  useTable({
+    descriptor,
+    entityMetadata,
+    autoLoad: true, // carga al montar (por defecto: true)
+    loader: async (params) => {
+      const result = await client.crud('store/books').findAll(params);
+      return {
+        rows: result.content,
+        pagination: {
+          page: result.page,
+          pageSize: result.pageSize,
+          totalSize: result.total,
+          pagesNumber: result.totalPages,
+          firstResult: 0,
+        },
+      };
+    },
+  });
+
+await sort('title');
+await search('clean');
+await nextPage();
+```
+
+### useCrud
+
+Ciclo de vida CRUD completo: formulario, tabla y una máquina de estados de modo `list | create | edit`:
+
+```typescript
+import { useCrud } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { view, mode, form, table, showForm, showTable, startCreate, startEdit, cancelEdit, save, remove } =
+  useCrud({
+    descriptor,
+    loader: async (params) => { /* obtener filas */ },
+    onSave: async (data, mode) => {
+      if (mode === 'create') await client.crud('books').create(data);
+      else await client.crud('books').update(data.id, data);
+    },
+    onDelete: async (entity) => {
+      await client.crud('books').delete(entity.id);
+    },
+  });
+```
+
+### useCrudPage
+
+Construye una página CRUD completa a partir de un `NavigationNode` de tipo `CrudPage`. Resuelve los metadatos y el descriptor con `CrudPageResolver`, conecta la carga de la tabla y los manejadores de guardar y eliminar, inicializa la vista y carga la primera página; es lo que `<DynamiaCrudPage>` usa internamente.
+
+```typescript
+import { useCrudPage } from '@dynamia-tools/vue';
+
+const { view, loading, error, reload } = useCrudPage({
+  node,   // NavigationNode (type: 'CrudPage')
+  client, // DynamiaClient
+});
+```
+
+### Acciones de fila y menú de fila
+
+`<DynamiaCrudPage>` muestra la acción principal de cada fila (editar) como botón y las demás acciones de fila en un menú «más». El menú lista solo las acciones que el servidor marca con `menuSupported`, ordenadas por `position`. Los filtros de la barra declarados con `FilterAction` y `Control` se dibujan como controles de fecha, elección o texto y se envían como filtros de `POST /find`.
+
+Consulta [Cómo funcionan las acciones](/es/guides/actions#menú-de-fila-y-orden) y [Filtros y consultas de listas](/es/guides/list-filters).
+
+### useEntityPicker
+
+Búsqueda y selección de entidades, respaldada por un callback `searcher`:
+
+```typescript
+import { useEntityPicker } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const { view, searchResults, selectedEntity, searchQuery, loading, search, select, clear } =
+  useEntityPicker({
+    descriptor,
+    searcher: async (query) => {
+      const result = await client.crud('books').findAll({ q: query });
+      return result.content;
+    },
+    initialValue: currentBook,
+  });
+```
+
+### useNavigation
+
+Obtiene y guarda en caché el `NavigationTree` de la aplicación. Usa directamente los tipos del SDK (`NavigationTree`, `NavigationNode`), sin un conjunto de tipos paralelo.
+
+```typescript
+import { useNavigation } from '@dynamia-tools/vue';
+import { client } from './lib/client';
+
+const {
+  tree,           // Ref<NavigationTree | null>
+  nodes,          // ComputedRef<NavigationNode[]>
+  currentModule,  // ComputedRef<NavigationNode | null>
+  currentGroup,   // ComputedRef<NavigationNode | null>
+  currentPage,    // ComputedRef<NavigationNode | null>
+  currentPath,    // Ref<string | null>
+  loading,
+  navigateTo,
+  clearCache,
+  reload,
+} = useNavigation(client, { autoSelectFirst: true });
+
+navigateTo('/pages/store/books');
+```
+
+El árbol se guarda en memoria del módulo tras la primera consulta: llama a `clearCache()` y luego a `reload()` para forzar una nueva consulta. Con `autoSelectFirst: true` se navega automáticamente a la primera página hoja disponible cuando el árbol termina de cargar.
+
+## Aplicación completa: navegación + patrón CrudPage
+
+El patrón habitual de un backoffice combina `useNavigation`, `<DynamiaNavMenu>` y `<DynamiaNavBreadcrumb>`, y `<DynamiaCrudPage>` para los nodos donde `type === 'CrudPage'`:
 
 ```vue
 <script setup lang="ts">
@@ -88,36 +289,102 @@ const activeNode = computed(() => currentPage.value);
 </script>
 
 <template>
-  <DynamiaNavMenu :nodes="nodes" :current-path="currentPath" @navigate="navigateTo" />
-  <DynamiaNavBreadcrumb :module="currentModule" :group="currentGroup" :page="activeNode" />
+  <aside>
+    <DynamiaNavMenu :nodes="nodes" :current-path="currentPath" @navigate="navigateTo" />
+  </aside>
 
-  <DynamiaCrudPage
-    v-if="activeNode?.type === 'CrudPage'"
-    :node="activeNode"
-    :client="client"
-  />
+  <header>
+    <DynamiaNavBreadcrumb :module="currentModule" :group="currentGroup" :page="activeNode" />
+  </header>
+
+  <main>
+    <DynamiaCrudPage
+      v-if="activeNode?.type === 'CrudPage'"
+      :node="activeNode"
+      :client="client"
+      @save="onSave"
+      @delete="onDelete"
+    />
+
+    <p v-else-if="activeNode">
+      Se seleccionó el nodo de tipo "{{ activeNode.type }}". Provee un renderizador para este tipo.
+    </p>
+  </main>
 </template>
 ```
 
-## Acciones de fila y menú de fila
+Con este patrón: la navegación carga automáticamente al montar, la primera página disponible se selecciona sola y cualquier nodo `CrudPage` se dibuja al instante sin conectar a mano formulario, tabla ni guardado. `<DynamiaCrudPage>` también expone los slots `#loading` y `#error` para estados personalizados.
 
-`<DynamiaCrudPage>` muestra la acción principal de cada fila (editar) como botón y las demás acciones de fila en un menú «más». El menú lista solo las acciones que el servidor marca con `menuSupported`, ordenadas por `position`. Los filtros de la barra declarados con `FilterAction` y `Control` se dibujan como controles de fecha, elección o texto y se envían como filtros de `POST /find`.
+## Tipos de vista personalizados
 
-Consulta [Cómo funcionan las acciones](/es/guides/actions#menú-de-fila-y-orden) y [Filtros y consultas de listas](/es/guides/list-filters).
+El registro que expone `ui-core` (`ViewRendererRegistry`) es abierto: módulos de terceros pueden registrar nuevos tipos de vista sin tocar los paquetes del núcleo ni el propio `@dynamia-tools/vue`:
 
-## Estado beta
+```typescript
+// kanban-plugin.ts
+import type { App } from 'vue';
+import type { ViewType, View, ViewRenderer } from '@dynamia-tools/ui-core';
+import { ViewRendererRegistry } from '@dynamia-tools/ui-core';
+import type { ViewDescriptor, EntityMetadata } from '@dynamia-tools/sdk';
+import KanbanBoard from './KanbanBoard.vue';
 
-El alcance beta actual es ideal para:
+const KanbanViewType: ViewType = { name: 'kanban' };
 
-- UIs de backoffice guiadas por metadata,
-- aplicaciones internas centradas en CRUD,
-- prototipos rapidos con poco boilerplate.
+class KanbanView extends View {
+  constructor(d: ViewDescriptor, m: EntityMetadata | null) {
+    super(KanbanViewType, d, m);
+  }
+  async initialize() { /* obtener los datos del tablero */ }
+  validate() { return true; }
+}
 
-Al ser beta, algunas APIs pueden evolucionar entre versiones menores. Fija versiones y prueba upgrades.
+class VueKanbanRenderer implements ViewRenderer<KanbanView, unknown> {
+  readonly supportedViewType = KanbanViewType;
+  render(_view: KanbanView) { return KanbanBoard; }
+}
 
-## Documentacion relacionada
+export const KanbanPlugin = {
+  install(app: App) {
+    ViewRendererRegistry.register(KanbanViewType, new VueKanbanRenderer());
+    ViewRendererRegistry.registerViewFactory(KanbanViewType, (d, m) => new KanbanView(d, m));
+  },
+};
+```
 
-- [SDK Frontend](/es/frontend-sdk)
-- [Extensiones](/es/extensions/)
-- Demo app: `framework/examples/demo-vue-books`
+```typescript
+// main.ts
+app.use(DynamiaVue);
+app.use(KanbanPlugin);
+```
 
+```vue
+<!-- Ahora funciona automáticamente -->
+<DynamiaViewer view-type="kanban" bean-class="com.example.Task" />
+```
+
+## Principios de diseño
+
+<CardGrid>
+  <Card title="Sin Pinia" icon="setting">
+    El estado vive dentro de las instancias de `View` y `Viewer` como `ref` o `shallowRef`. Integrar Pinia,
+    si lo quieres, es un asunto de la aplicación.
+  </Card>
+  <Card title="Sin duplicar tipos" icon="document">
+    Todos los tipos del SDK (`ViewDescriptor`, `EntityMetadata`, `NavigationTree`, …) se importan de
+    `@dynamia-tools/sdk` y nunca se redefinen.
+  </Card>
+  <Card title="Componentes de campo perezosos" icon="rocket">
+    Los componentes de campo se cargan con `defineAsyncComponent` para mantener pequeño el paquete principal.
+  </Card>
+  <Card title="Extensión abierta" icon="puzzle">
+    `ViewType` y `FieldComponent` son objetos simples, no enums: los módulos de terceros los extienden sin
+    tocar los paquetes del núcleo.
+  </Card>
+</CardGrid>
+
+## Documentación relacionada
+
+<LinkButton href="/es/frontend-sdk">SDK Frontend</LinkButton>
+<LinkButton href="/es/extensions/" variant="secondary">Extensiones</LinkButton>
+
+- App de demostración: `framework/examples/demo-vue-books`
+- Código del paquete: `platform/packages/vue`
