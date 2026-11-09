@@ -1,0 +1,60 @@
+---
+title: Release Notes
+description: What changed in each Dynamia Platform release, starting with 26.11.0, with links to the guides that document the new APIs.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Dynamia Platform uses [CalVer](/key-concepts) (`YY.MM.MINOR`) and every module, extension and npm package shares
+the same version. This page summarizes the notable changes and points to the guide for each one. The complete
+list of every release is on [GitHub](https://github.com/dynamiatools/framework/releases).
+
+## 26.11.0
+
+Published to Maven Central, GitHub Packages and npm (`@dynamia-tools/*`, all at 26.11.0).
+
+### UI ports, second wave
+
+Actions can do more without importing ZK:
+
+- `UINavigation.openPage` and `UINavigation.refresh`
+- `CrudControllerAPI.getSelection()`
+- `UIChoices.pickEntity` over `EntityLookup` beans
+- `UIClipboard.copy`
+- Inline file previews with `UIFiles.preview`
+- `UIMessages.showInput` with a date range (`LocalDateRange`)
+
+See [UI Ports for Actions](/guides/ui-ports).
+
+### Queries and filters
+
+- `POST /api/{path}/find` takes a standard `QuerySpec` (filters with operators, search, sort, paging) and can be
+  narrowed on the server with `QuerySpecFilter` beans.
+- Portable toolbar controls (`Control`, `FilterAction`) are drawn by ZK and by Vue.
+- `crud(path).find(QuerySpec)` in `@dynamia-tools/sdk`.
+
+See [List Filters and Queries](/guides/list-filters) and [Frontend SDK](/frontend-sdk#filter-search-and-sort-with-find).
+
+### Actions published to clients
+
+`menuSupported` and `position` are now part of the action metadata. The Vue row menu lists only the actions with
+`menuSupported` and sorts them by `position`. See [How Actions Work](/guides/actions#row-menu-and-ordering).
+
+### Vue
+
+Toolbar controls, row actions and the row menu are styled. See [Vue Support](/vue-support).
+
+### SaaS migration
+
+Export jobs are finalized as the root tenant, which fixes an empty download. See [SaaS](/extensions/saas).
+
+### Deprecation
+
+`HeadlessCapable` is no longer used by the framework. Declare `@RunsOn(ActionRuntime.HEADLESS)` on the concrete class
+instead. See [Publishing actions to remote clients](/guides/actions#publishing-actions-to-remote-clients-runson).
+
+<Aside type="tip" title="Upgrading">
+Change the version of the Dynamia Platform dependencies to `26.11.0` and the `@dynamia-tools/*` npm packages to
+`26.11.0`. Replace `HeadlessCapable` with `@RunsOn(ActionRuntime.HEADLESS)` when you next touch an action that
+implements it.
+</Aside>
