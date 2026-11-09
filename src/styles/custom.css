@@ -1,20 +1,20 @@
 /*
- * Brand accent: green, hue 150.
+ * Brand accent: the teal at the midpoint of the logo gradient (#159957 to #155799), hue 176.
  * Starlight uses three accent tokens: -low (tinted backgrounds), the accent itself (buttons, active items)
- * and -high (text and links in the light theme). Contrast was checked against WCAG AA (4.5:1):
- *   dark  theme: accent hsl(150 76% 34%) on the dark background = 4.8:1; black text on the accent = 5.7:1
- *   light theme: accent-high hsl(150 76% 24%) on white = 6.5:1; white text on accent hsl(150 76% 30%) = 4.6:1
+ * and -high (text and links in the light theme). Contrast checked against WCAG AA (4.5:1):
+ *   dark  theme: accent hsl(176 62% 46%) on the dark background = 7:1; black text on the accent = 8:1
+ *   light theme: accent-high hsl(176 75% 22%) on white = 8:1; white text on accent hsl(176 75% 28%) = 5:1
  */
 :root {
-    --sl-color-accent-low: hsl(150, 50%, 14%);
-    --sl-color-accent: hsl(150, 76%, 34%);
-    --sl-color-accent-high: hsl(150, 70%, 65%);
+    --sl-color-accent-low: hsl(176, 50%, 14%);
+    --sl-color-accent: hsl(176, 62%, 46%);
+    --sl-color-accent-high: hsl(176, 70%, 68%);
 }
 
 :root[data-theme="light"] {
-    --sl-color-accent-low: hsl(150, 60%, 92%);
-    --sl-color-accent: hsl(150, 76%, 30%);
-    --sl-color-accent-high: hsl(150, 76%, 24%);
+    --sl-color-accent-low: hsl(176, 50%, 92%);
+    --sl-color-accent: hsl(176, 75%, 28%);
+    --sl-color-accent-high: hsl(176, 75%, 22%);
 }
 
 [data-has-hero] header {

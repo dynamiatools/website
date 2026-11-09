@@ -1,119 +1,22 @@
 ---
 title: Dynamia Platform
-description: Full-stack Java 25 framework for enterprise web applications powered by Spring Boot 4 and ZK 10
+description: Java, Kotlin and Groovy framework on Spring Boot 4 that turns JPA entities into a REST API and a Vue frontend without code generation, with ZK screens built in
 template: splash
 hero:
-    tagline: The next generation of DynamiaTools. A cutting-edge full-stack Java 25 framework engineered for building robust, scalable enterprise web applications, powered by Spring Boot 4 and ZK 10.
-    image:
-        file: ../../assets/dynamia-tools-splash.webp
+    title: Write the entity. Ship the application.
+    tagline: "A JPA entity and a YAML descriptor become a REST API and a Vue frontend, with no code generation. Java, Kotlin or Groovy, with ZK built in."
     actions:
-        - text: Getting Started
+        - text: Start building
           link: /getting-started/
-          icon: right-arrow
-        - text: What's new in 26.11.0
+          variant: primary
+        - text: See what's new in 26.11.0
           link: /reference/release-notes/
-          icon: star
           variant: secondary
-        - text: View on Github
+        - text: View on GitHub
           link: https://github.com/dynamiatools/framework
-          icon: external
           variant: minimal
 ---
 
-import {Card, CardGrid, LinkButton, LinkCard} from '@astrojs/starlight/components';
-import {dynamiaToolsVersion} from '../../../astro.config.mjs';
+import HomeBody from '../../components/home/HomeBody.astro';
 
-export const version = dynamiaToolsVersion;
-
-## Choose your path
-
-<CardGrid>
-    <LinkCard title="I am new here" description="Build a running application with CRUD screens and REST endpoints in minutes." href="/getting-started/" />
-    <LinkCard title="Model my data" description="Entities, the Crud Service, listeners and validators." href="/guides/entities/" />
-    <LinkCard title="Build screens and actions" description="View descriptors, navigation, actions, UI ports and list filters." href="/view-descriptors/" />
-    <LinkCard title="Use a Vue or TypeScript frontend" description="The typed SDK and metadata-driven Vue components." href="/frontend-sdk/" />
-    <LinkCard title="Add enterprise features" description="SaaS, reports, dashboards, security, files, email and SMS." href="/extensions/" />
-    <LinkCard title="Look something up" description="Quick reference and release notes." href="/reference/quick-reference/" />
-</CardGrid>
-
-## About the platform
-
-<CardGrid stagger>
-    <Card title="What is Dynamia Platform?" icon="pencil">
-        **Dynamia Platform** is the next generation of DynamiaTools—a unified, batteries-included framework for building Java 25 enterprise web applications fast and easy using standard design patterns, view descriptors for automatic UI generation, actions, services, and modules.
-
-        Powered by **Spring Boot 4** (https://spring.io), **ZK 10** (https://www.zkoss.org) for automatic web UI generation, and **JPA** for data persistence.
-
-        Now with **CalVer versioning** (YY.MM.MINOR) and all modules unified in one version: **{version}**.
-    </Card>
-    <Card title="What can it do?" icon="add-document">
-        * **Build full-stack web applications** with automatic UI generation
-        * **Write modular applications** - Create modules (JAR files) and reuse them across projects (DRY principle)
-        * **Automatic CRUD views and REST endpoints** - Zero code required for standard operations
-        * **Enterprise-ready extensions** - Multi-tenancy (SaaS), reporting, dashboards, email/SMS, security, and more
-        * **Extend the framework** with custom modules, actions, and services
-        * **Modern HTML5 support** via ZK framework - Use Bootstrap, CSS3, and HTML5 technologies
-        * **Customize with themes and templates** - Pluggable UI theming system
-        * **Seamless integration** with any Java framework or library
-
-    </Card>
-    <Card title="Is it mature and production-ready?" icon="setting">
-        **Absolutely!** Dynamia Platform has **13+ years** of continuous development and powers **10+ production projects** with **40+ enterprise modules** in real-world environments.
-
-        Built on the best frameworks in the Java ecosystem:
-        * **Spring Boot 4** for modern infrastructure and easy deployment
-        * **Java 25** - Latest innovations and performance
-        * **ZK 10** for automatic web user interface generation
-        * **JPA** for standard persistence layer
-        * **Jackson** for JSON/XML serialization
-        * **YAML** for declarative view descriptors
-
-        <LinkButton href="/history" variant="secondary">
-            Know our history
-        </LinkButton>
-    </Card>
-    <Card title="What's new in 26.11.0?" icon="star">
-        The latest release ({version}) brings:
-
-        * 🧩 **UI ports** - Actions that talk to the user without ZK: entity pickers, file previews, clipboard and navigation
-        * 🔎 **Queries and filters** - `POST /find` with a standard `QuerySpec`, portable toolbar filters and `crud(path).find()` in the SDK
-        * 📋 **Row menu** - Actions publish `menuSupported` and `position` to Vue and other clients
-        * 🏢 **SaaS** - Export jobs finalized as the root tenant, fixing an empty download
-
-        <LinkButton href="/reference/release-notes/" variant="secondary">
-            Read the release notes
-        </LinkButton>
-    </Card>
-    <Card title="Frontend SDK - Build Modern UIs" icon="laptop">
-        The new frontend stack is now modular:
-
-        * **@dynamia-tools/sdk** as the core typed API client
-        * **@dynamia-tools/vue** for metadata-driven Vue UIs (**beta**)
-        * Extension SDKs for reports, files, and SaaS when needed
-
-        <LinkButton href="/frontend-sdk" variant="secondary">
-            Learn more about the SDK →
-        </LinkButton>
-
-        <LinkButton href="/vue-support" variant="minimal">
-            Vue Support (Beta)
-        </LinkButton>
-    </Card>
-    <Card title="Quick Start" icon="rocket">
-        Get started in minutes:
-
-        1. Create a Spring Boot 4 + Java 25 project
-        2. Add `tools.dynamia.app:{version}` dependency
-        3. Add `@EnableDynamiaTools` annotation
-        4. ¡Run and enjoy your full-stack application!
-
-        Read the [Getting Started](/getting-started) guide for detailed instructions and examples.
-    </Card>
-    <Card title="Read the docs" icon="open-book">
-        Start with the [Getting Started](/getting-started) guide to quickly get up and running. Learn about [Key Concepts](/key-concepts) and explore advanced topics to deepen your knowledge.
-
-        Discover the **built-in enterprise extensions**, customize your application, extend the framework, and build innovative solutions with **Dynamia Platform**.
-
-        Check out [Frontend SDK](/frontend-sdk), [Vue Support (Beta)](/vue-support), and [Extensions](/extensions/) to build modern web frontends.
-    </Card>
-</CardGrid>
+<HomeBody lang="en" />

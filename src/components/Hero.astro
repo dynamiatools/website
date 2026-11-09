@@ -1,0 +1,294 @@
+---
+// Overrides Starlight's Hero. Only the two home pages get the custom hero; any other
+// page that uses a hero (Buckie) keeps the default one.
+import Default from '@astrojs/starlight/components/Hero.astro';
+import { Image } from 'astro:assets';
+import mark from '../assets/dynamia-tools-splash.webp';
+import '@fontsource-variable/geist/index.css';
+import '@fontsource-variable/geist-mono/index.css';
+import '../styles/home.css';
+import { copy, type Lang } from './home/copy';
+import { highlight } from './home/highlight';
+
+const { entry, lang } = Astro.locals.starlightRoute;
+const path = Astro.url.pathname.replace(/\/$/, '');
+const isHome = path === '' || path === '/es';
+const t = copy[(lang === 'es' ? 'es' : 'en') as Lang];
+const { title = entry.data.title, tagline, actions = [] } = entry.data.hero ?? {};
+const titleLines = (title ?? '').split(/(?<=\.)\s+/);
+
+const sources = [
+	{
+		id: 'entity',
+		file: 'Book.java',
+		lang: 'java' as const,
+		code: `@Entity
+public class Book extends BaseEntity {
+
+    @NotEmpty
+    private String title;
+    private String author;
+    private String isbn;
+    private BookStatus status;
+    private BigDecimal price;
+}`,
+	},
+	{
+		id: 'view',
+		file: 'BookTable.yml',
+		lang: 'yaml' as const,
+		code: `# META-INF/descriptors/BookTable.yml
+view: table
+beanClass: mybookstore.domain.Book
+autofields: false
+
+fields:
+  title:
+  author:
+  isbn:
+  status:
+  price:
+    params:
+      converter: converters.CurrencySimple`,
+	},
+	{
+		id: 'action',
+		file: 'CopyIsbnAction.java',
+		lang: 'java' as const,
+		code: `@InstallAction
+public class CopyIsbnAction extends AbstractCrudAction {
+
+    public CopyIsbnAction() {
+        setName("Copy ISBN");
+        setApplicableClass(Book.class);
+        setMenuSupported(true);
+    }
+
+    @Override
+    public void actionPerformed(CrudActionEvent evt) {
+        var book = (Book) evt.getData();
+        UIClipboard.copy(book.getIsbn());
+    }
+}`,
+	},
+].map((s) => ({ ...s, lines: highlight(s.code, s.lang), raw: s.code.split('\n') }));
+
+const ui = t.stage.ui;
+const rows = [
+	['Clean Code', 'Robert C. Martin', '978-0132350884', 'available', '$42.00'],
+	['Domain-Driven Design', 'Eric Evans', '978-0321125217', 'reserved', '$55.00'],
+	['Effective Java', 'Joshua Bloch', '978-0134685991', 'available', '$45.00'],
+	['Refactoring', 'Martin Fowler', '978-0134757599', 'out', '$49.00'],
+] as const;
+---
+
+{
+	isHome ? (
+		<div class="dh dh-hero">
+			<div class="dh-hero-bg" aria-hidden="true" />
+			<div class="dh-mark" aria-hidden="true">
+				<Image src={mark} alt="" width={460} loading="eager" fetchpriority="high" />
+			</div>
+
+			<h1 class="dh-title">
+				{titleLines.map((line, i) => (
+					<span class="dh-line">
+						<span style={`--i:${i}`}>{line}</span>
+					</span>
+				))}
+			</h1>
+
+			<div class="dh-intro">
+				{tagline && <p class="dh-lead">{tagline}</p>}
+				<div class="dh-actions">
+					{actions.map((a) => (
+						<a class={`dh-btn dh-btn-${a.variant}`} href={a.link}>
+							{a.text}
+						</a>
+					))}
+				</div>
+				<div class="dh-install">
+					<code><span class="dh-prompt" aria-hidden="true">$</span> curl -fsSL https://get.dynamia.tools | bash</code>
+					<button type="button" class="dh-copy" data-copy data-copy-text="curl -fsSL https://get.dynamia.tools | bash" data-label={t.start.copy} data-done-label={t.start.copied}>{t.start.copy}</button>
+				</div>
+			</div>
+
+			<section class="dh-stage" data-tab="entity" aria-label={t.stage.label}>
+				<div class="dh-win dh-src">
+					<div class="dh-bar">
+						<div class="dh-tabs" role="tablist" aria-label={t.stage.youWrite}>
+							{sources.map((s, i) => (
+								<button
+									type="button"
+									role="tab"
+									id={`dh-tab-${s.id}`}
+									class="dh-tab"
+									data-tab={s.id}
+									aria-selected={i === 0 ? 'true' : 'false'}
+									aria-controls={`dh-panel-${s.id}`}
+									tabindex={i === 0 ? 0 : -1}
+								>
+									{s.file}
+								</button>
+							))}
+						</div>
+						<button type="button" class="dh-play" aria-pressed="false" data-play={t.stage.autoplayPlay} data-pause={t.stage.autoplayPause} aria-label={t.stage.autoplayPause}>
+							<svg class="i-pause" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4 2.5h3v11H4zM9 2.5h3v11H9z" /></svg>
+							<svg class="i-play" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M4.5 2.5v11l9-5.5z" /></svg>
+						</button>
+					</div>
+					<div class="dh-panels">
+						{sources.map((s, i) => (
+							<div
+								role="tabpanel"
+								id={`dh-panel-${s.id}`}
+								class={`dh-panel${i === 0 ? ' is-active' : ''}`}
+								aria-labelledby={`dh-tab-${s.id}`}
+								tabindex="0"
+							>
+								<pre><code>{s.lines.map((html, n) => (
+									<span class="ln" style={`--i:${n};--n:${Math.max(s.raw[n].length, 1)}`} set:html={html || '&#8203;'} />
+								))}</code></pre>
+							</div>
+						))}
+					</div>
+					<p class="dh-foot dh-foot-src">{t.stage.youWrite}</p>
+				</div>
+
+				<div class="dh-flow" aria-hidden="true">
+					<i />
+				</div>
+
+				<div class="dh-win dh-out" role="img" aria-label={ui.a11y}>
+					<div class="dh-bar dh-bar-out">
+						<span class="dh-url">app.example.com/store/books</span>
+						<span class="dh-rest">GET /api/store/books</span>
+					</div>
+					<div class="dh-app" aria-hidden="true">
+						<div class="u-top">
+							<strong class="u-title">{ui.title}</strong>
+							<span class="u-search">{ui.search}</span>
+							<span class="u-filter">
+								<b class="on">{ui.all}</b>
+								<b>{ui.states.available}</b>
+								<b>{ui.states.reserved}</b>
+							</span>
+							<span class="u-btns">
+								<b class="u-btn u-primary">{ui.newItem}</b>
+								<b class="u-btn">{ui.edit}</b>
+								<b class="u-btn">{ui.delete}</b>
+							</span>
+						</div>
+						<div class="u-wrap">
+						<table class="u-table">
+							<thead>
+								<tr data-hl="entity view">
+									{ui.cols.map((c, i) => (
+										<th class={i === 4 ? 'u-col-price' : undefined}>{c}</th>
+									))}
+									<th class="u-dots" />
+								</tr>
+							</thead>
+							<tbody>
+								{rows.map((r, i) => (
+									<tr style={`--r:${i}`}>
+										<td>{r[0]}</td>
+										<td>{r[1]}</td>
+										<td class="u-mono">{r[2]}</td>
+										<td>
+											<em class={`u-pill u-${r[3]}`} data-hl="entity">{ui.states[r[3]]}</em>
+										</td>
+										<td class="u-col-price" data-hl="view">
+											{r[4]}
+										</td>
+										<td class={`u-dots${i === 3 ? ' on' : ''}`}>&#8942;</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+						<div class="u-menu" data-hl="action">
+							<span>{ui.edit}</span>
+							<span class="u-menu-hit">{ui.copyIsbn}</span>
+						</div>
+						</div>
+						<div class="u-foot">{ui.page}</div>
+					</div>
+					<p class="dh-foot dh-foot-out">{t.stage.generated}</p>
+				</div>
+			</section>
+		</div>
+	) : (
+		<Default {...Astro.props}><slot /></Default>
+	)
+}
+
+<script>
+	// Tabs of the source window: click, arrow keys and a gentle autoplay that stops on any interaction.
+	const stage = document.querySelector<HTMLElement>('.dh-stage');
+	if (stage) {
+		const tabs = [...stage.querySelectorAll<HTMLButtonElement>('.dh-tab')];
+		const panels = [...stage.querySelectorAll<HTMLElement>('.dh-panel')];
+		const play = stage.querySelector<HTMLButtonElement>('.dh-play')!;
+		const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+		let index = 0;
+		let timer: number | undefined;
+		let paused = reduce.matches;
+
+		const show = (i: number, focus = false) => {
+			index = (i + tabs.length) % tabs.length;
+			stage.dataset.tab = tabs[index].dataset.tab;
+			stage.dataset.live = 'true';
+			tabs.forEach((t, n) => {
+				t.setAttribute('aria-selected', String(n === index));
+				t.tabIndex = n === index ? 0 : -1;
+			});
+			panels.forEach((p, n) => p.classList.toggle('is-active', n === index));
+			if (focus) tabs[index].focus();
+		};
+
+		const stop = () => {
+			if (timer) window.clearInterval(timer);
+			timer = undefined;
+		};
+		const start = () => {
+			stop();
+			if (paused || reduce.matches) return;
+			timer = window.setInterval(() => show(index + 1), 7000);
+		};
+		const setPaused = (value: boolean) => {
+			paused = value;
+			play.setAttribute('aria-pressed', String(value));
+			play.setAttribute('aria-label', (value ? play.dataset.play : play.dataset.pause) ?? '');
+			stage.classList.toggle('is-paused', value);
+			value ? stop() : start();
+		};
+
+		tabs.forEach((tab, n) => {
+			tab.addEventListener('click', () => {
+				setPaused(true);
+				show(n);
+			});
+			tab.addEventListener('keydown', (e) => {
+				const key = e.key;
+				if (key === 'ArrowRight' || key === 'ArrowLeft' || key === 'Home' || key === 'End') {
+					e.preventDefault();
+					setPaused(true);
+					show(key === 'Home' ? 0 : key === 'End' ? tabs.length - 1 : n + (key === 'ArrowRight' ? 1 : -1), true);
+				}
+			});
+		});
+		play.addEventListener('click', () => setPaused(!paused));
+		stage.addEventListener('pointerenter', stop);
+		stage.addEventListener('pointerleave', start);
+		stage.addEventListener('focusin', stop);
+		stage.addEventListener('focusout', start);
+		document.addEventListener('visibilitychange', () => (document.hidden ? stop() : start()));
+
+		setPaused(paused);
+		// Start cycling only after the entrance sequence has played.
+		if (!paused) {
+			stop();
+			window.setTimeout(start, 4500);
+		}
+	}
+</script>

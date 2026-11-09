@@ -155,10 +155,16 @@ Key Dynamia Platform concepts to explain clearly:
 ## Styling
 
 ### Custom Theme
-- Primary accent color: `hsl(150, 76%, 34%)` (green) in dark mode; light mode uses `accent` `hsl(150, 76%, 30%)` and `accent-high` `hsl(150, 76%, 24%)` so text and buttons pass WCAG AA (see `src/styles/custom.css`)
-- Custom styles in `src/styles/custom.css`
-- Use CSS variables from Starlight theme
+- Brand color: the teal at the midpoint of the logo gradient (`#159957` to `#155799`), hue 176. Dark mode: accent `hsl(176, 62%, 46%)`. Light mode: `accent` `hsl(176, 75%, 28%)` and `accent-high` `hsl(176, 75%, 22%)`, so text and buttons pass WCAG AA (see `src/styles/custom.css`)
+- Custom styles in `src/styles/custom.css`; use CSS variables from the Starlight theme
 - Support both light and dark modes
+
+### Home page
+- The home is a custom design on the same `splash` template: `src/components/Hero.astro` overrides Starlight's Hero (only for `/` and `/es/`; other hero pages keep the default), `src/components/home/HomeBody.astro` renders the sections, `src/components/home/copy.ts` holds the English and Spanish text and `src/styles/home.css` all its styles (scoped under `.dh`)
+- Messaging order: Vue frontend first, ZK as a built-in second option
+- Fonts (self-hosted, loaded only on the home): Geist and Geist Mono via `@fontsource-variable`
+- CSS-only motion respects `prefers-reduced-motion`; the hero demo tabs use a small inline script
+- To change home text edit `copy.ts` and the hero frontmatter of `index.mdx` and `es/index.mdx`, and keep both languages in sync
 
 ### Component Usage
 Prefer using Starlight's built-in components:
