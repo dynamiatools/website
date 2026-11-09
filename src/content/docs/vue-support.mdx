@@ -220,6 +220,15 @@ const { view, loading, error, reload } = useCrudPage({
 });
 ```
 
+### Row actions and the row menu
+
+`<DynamiaCrudPage>` shows the main action of each row (edit) as a button and the other row actions
+in a "more" menu. The menu lists only the actions the server marks with `menuSupported`, sorted by
+`position`. Toolbar filters declared with `FilterAction` and `Control` are drawn as date, choice or
+text controls and sent as filters of `POST /find`.
+
+See [How Actions Work](/guides/actions#row-menu-and-ordering) and [List Filters and Queries](/guides/list-filters).
+
 ### useEntityPicker
 
 Entity search and selection, backed by a `searcher` callback:
