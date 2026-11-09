@@ -8,7 +8,7 @@ export const copy = {
 		stage: {
 			label: 'A Java entity, a YAML descriptor and an action turn into a working screen',
 			youWrite: 'You write',
-			generated: 'Dynamia generates',
+			generated: 'Built at runtime, no code generated',
 			preview: 'Generated screen',
 			rest: 'Also served as REST',
 			autoplayPause: 'Pause the demo',
@@ -29,6 +29,16 @@ export const copy = {
 					'A books list with a search box, a status filter, New, Edit and Delete buttons, a table of four books and a row menu with Edit and Copy ISBN.',
 			},
 		},
+		principles: {
+			title: 'Nothing to generate, nothing to keep in sync',
+			lead: 'The platform works from your entity and its descriptors as they are, so the model stays the single source of truth.',
+			items: [
+				['No code generation', 'Screens and endpoints are built at runtime from your entity and its descriptor. There are no generated classes to commit, review or regenerate when the model changes.'],
+				['Automatic DTO conversion', 'Entities are converted to BeanMaps, plain key-value maps that carry only the properties the view declares. Your frontend stays independent of the entity classes, and you write no DTOs.'],
+				['Java, Kotlin or Groovy', 'Write the backend in the JVM language you prefer. The annotations, descriptors and APIs are the same.'],
+			],
+			langs: ['Java', 'Kotlin', 'Groovy'],
+		},
 		layers: {
 			title: 'One model, every layer',
 			lead: 'You describe the entity once. The platform builds the rest of the stack from it, and each layer stays open to your own code.',
@@ -37,7 +47,7 @@ export const copy = {
 				['Crud service and listeners', 'Persistence, queries and lifecycle hooks behind one interface.', 'CrudService'],
 				['REST API', 'Endpoints per page, with filtering, sorting and paging through one query message.', 'POST /api/{path}/find'],
 				['Vue components', 'Pages, forms and tables that render themselves from the server metadata, over the same API.', '<DynamiaCrudPage>'],
-				['ZK screens', 'Server-rendered CRUD views from the same YAML descriptors, built in when you prefer to stay in Java.', 'view: crud'],
+				['ZK screens', 'Server-rendered CRUD views from the same YAML descriptors, built in when you prefer server-side screens.', 'view: crud'],
 			],
 			more: 'Read the key concepts',
 		},
@@ -99,7 +109,7 @@ export const copy = {
 		stage: {
 			label: 'Una entidad Java, un descriptor YAML y una acción se convierten en una pantalla funcionando',
 			youWrite: 'Tú escribes',
-			generated: 'Dynamia genera',
+			generated: 'Se construye al ejecutar, sin generar código',
 			preview: 'Pantalla generada',
 			rest: 'También como REST',
 			autoplayPause: 'Pausar la demostración',
@@ -120,6 +130,16 @@ export const copy = {
 					'Una lista de libros con cuadro de búsqueda, filtro de estado, botones Nuevo, Editar y Eliminar, una tabla de cuatro libros y un menú de fila con Editar y Copiar ISBN.',
 			},
 		},
+		principles: {
+			title: 'Nada que generar, nada que mantener sincronizado',
+			lead: 'La plataforma trabaja con tu entidad y sus descriptores tal como están, así que el modelo sigue siendo la única fuente de verdad.',
+			items: [
+				['Sin generación de código', 'Las pantallas y los endpoints se construyen al ejecutar, a partir de tu entidad y su descriptor. No hay clases generadas que versionar, revisar ni regenerar cuando cambia el modelo.'],
+				['Conversión automática a DTO', 'Las entidades se convierten en BeanMaps, mapas clave-valor que llevan solo las propiedades que declara la vista. Tu frontend queda independiente de las clases de entidad y no escribes DTOs.'],
+				['Java, Kotlin o Groovy', 'Escribe el backend en el lenguaje de la JVM que prefieras. Las anotaciones, los descriptores y las APIs son los mismos.'],
+			],
+			langs: ['Java', 'Kotlin', 'Groovy'],
+		},
 		layers: {
 			title: 'Un modelo, todas las capas',
 			lead: 'Describes la entidad una sola vez. La plataforma construye el resto de la pila a partir de ella, y cada capa sigue abierta a tu propio código.',
@@ -128,7 +148,7 @@ export const copy = {
 				['Crud service y listeners', 'Persistencia, consultas y ganchos del ciclo de vida tras una sola interfaz.', 'CrudService'],
 				['API REST', 'Endpoints por página, con filtros, orden y paginación en un solo mensaje de consulta.', 'POST /api/{path}/find'],
 				['Componentes Vue', 'Páginas, formularios y tablas que se dibujan solos desde los metadatos del servidor, sobre la misma API.', '<DynamiaCrudPage>'],
-				['Pantallas ZK', 'Vistas CRUD en el servidor desde los mismos descriptores YAML, incluidas si prefieres quedarte en Java.', 'view: crud'],
+				['Pantallas ZK', 'Vistas CRUD en el servidor desde los mismos descriptores YAML, incluidas si prefieres pantallas en el servidor.', 'view: crud'],
 			],
 			more: 'Lee los conceptos clave',
 		},

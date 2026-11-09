@@ -147,11 +147,38 @@
 
 .dh-intro {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: 1.75rem 3rem;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 1.75rem;
 	margin-top: clamp(1.25rem, 3vw, 2.25rem);
+}
+
+/* The Dynamia Tools mark, from the logo: it fills the right side beside the headline and intro */
+.dh-mark {
+	position: absolute;
+	z-index: -1;
+	top: clamp(0.5rem, 2vw, 2.5rem);
+	right: -2.5rem;
+	width: clamp(13rem, 21vw, 19rem);
+	pointer-events: none;
+	animation: dh-float 9s ease-in-out infinite alternate, dh-fade 1.2s 0.4s both;
+}
+
+.dh-mark::before {
+	content: '';
+	position: absolute;
+	inset: 8% 4%;
+	z-index: -1;
+	border-radius: 50%;
+	background: radial-gradient(closest-side, var(--dh-glow-b), transparent 72%), radial-gradient(closest-side at 30% 60%, var(--dh-glow-a), transparent 70%);
+	filter: blur(24px);
+}
+
+.dh-mark img {
+	display: block;
+	width: 100%;
+	height: auto;
+	filter: drop-shadow(0 24px 50px rgba(0, 0, 0, 0.35));
 }
 
 .dh-lead {
@@ -845,6 +872,51 @@
 	white-space: nowrap;
 }
 
+/* Principles: three plain statements, the first one louder */
+
+.dh-points {
+	list-style: none !important;
+}
+
+.dh-point {
+	padding-block: 1.6rem;
+	border-top: 1px solid var(--dh-line);
+}
+
+.dh-point:first-child {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.dh-point h3 {
+	font-family: var(--dh-display);
+	font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+	font-weight: 600;
+	letter-spacing: -0.035em;
+	border: 0;
+}
+
+.dh-point:first-child h3 {
+	font-size: clamp(2rem, 4.2vw, 3.2rem);
+	line-height: 1.02;
+	letter-spacing: -0.045em;
+}
+
+.dh-point p {
+	margin-top: 0.6rem;
+	max-width: 36rem;
+	color: var(--dh-muted);
+	line-height: 1.6;
+	font-size: 1.06rem;
+}
+
+.dh-langs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin-top: 1rem;
+}
+
 /* Frontend: two code windows */
 
 .dh-codes {
@@ -1184,6 +1256,15 @@
 	}
 }
 
+@keyframes dh-float {
+	from {
+		transform: translateY(0) rotate(-1.5deg);
+	}
+	to {
+		transform: translateY(-14px) rotate(1.5deg);
+	}
+}
+
 @keyframes dh-drift {
 	from {
 		transform: translate3d(0, 0, 0);
@@ -1237,6 +1318,10 @@
 /* ---------- Responsive ---------- */
 
 @media (max-width: 62rem) {
+	.dh-mark {
+		display: none;
+	}
+
 	.dh-stage {
 		grid-template-columns: minmax(0, 1fr);
 	}

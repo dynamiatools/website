@@ -10,7 +10,7 @@ interface Props {
 const { lang } = Astro.props;
 const t = copy[lang];
 
-const stack = ['Java 25', 'Spring Boot 4', 'Vue 3', 'TypeScript', 'REST', 'YAML descriptors', 'JPA', 'ZK 10', 'Maven', 'Gradle'];
+const stack = ['Java 25', 'Kotlin', 'Groovy', 'Spring Boot 4', 'Vue 3', 'TypeScript', 'REST', 'YAML descriptors', 'JPA', 'ZK 10', 'Maven', 'Gradle'];
 
 const sdkCode = `import { DynamiaClient } from '@dynamia-tools/sdk';
 
@@ -80,6 +80,30 @@ const codes = {
 				))
 			}
 		</ol>
+	</section>
+
+	<section class="dh-sec" aria-labelledby="dh-principles-title">
+		<div class="dh-sec-head">
+			<h2 class="dh-h2" id="dh-principles-title">{t.principles.title}</h2>
+			<p class="dh-sec-lead">{t.principles.lead}</p>
+		</div>
+		<ul class="dh-points">
+			{
+				t.principles.items.map(([name, text], i) => (
+					<li class="dh-point">
+						<h3>{name}</h3>
+						<p>{text}</p>
+						{i === 2 && (
+							<div class="dh-langs">
+								{t.principles.langs.map((l) => (
+									<code class="dh-chip">{l}</code>
+								))}
+							</div>
+						)}
+					</li>
+				))
+			}
+		</ul>
 	</section>
 
 	<section class="dh-sec" aria-labelledby="dh-front-title">

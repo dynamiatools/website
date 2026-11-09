@@ -2,6 +2,8 @@
 // Overrides Starlight's Hero. Only the two home pages get the custom hero; any other
 // page that uses a hero (Buckie) keeps the default one.
 import Default from '@astrojs/starlight/components/Hero.astro';
+import { Image } from 'astro:assets';
+import mark from '../assets/dynamia-tools-splash.webp';
 import '@fontsource-variable/geist/index.css';
 import '@fontsource-variable/geist-mono/index.css';
 import '../styles/home.css';
@@ -84,6 +86,9 @@ const rows = [
 	isHome ? (
 		<div class="dh dh-hero">
 			<div class="dh-hero-bg" aria-hidden="true" />
+			<div class="dh-mark" aria-hidden="true">
+				<Image src={mark} alt="" width={460} loading="eager" fetchpriority="high" />
+			</div>
 
 			<h1 class="dh-title">
 				{titleLines.map((line, i) => (
